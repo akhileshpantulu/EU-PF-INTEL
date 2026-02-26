@@ -1099,27 +1099,30 @@ async function init() {
 // ─────────────────────────────────────────
 async function refreshAllData() {
   const btn = document.getElementById('header-refresh-btn');
+  const lastFetchEl = document.getElementById('last-fetch');
   btn.disabled = true;
-  btn.textContent = '↻ Refreshing…';
+  btn.textContent = '↻ Starting…';
   try {
-    // Capture current lastFetch before triggering refresh
     const before = await fetch('/api/metadata').then(r => r.json()).catch(() => ({}));
     await fetch('/api/refresh', { method: 'POST' });
-    // Poll metadata every 5 s until lastFetch changes (refresh complete)
+    // Re-enable immediately — the fetch runs in background on the server
+    btn.disabled = false;
+    btn.textContent = '↻ Refresh Data';
+    if (lastFetchEl) lastFetchEl.textContent = 'Refreshing data in background…';
+    // Poll every 10 s (up to 10 min) until lastFetch changes, then auto-reload
+    let polls = 0;
     const poll = setInterval(async () => {
+      polls++;
       const after = await fetch('/api/metadata').then(r => r.json()).catch(() => ({}));
       if (after.lastFetch && after.lastFetch !== before.lastFetch) {
         clearInterval(poll);
-        btn.textContent = '↻ Done — reloading…';
-        setTimeout(() => location.reload(), 800);
+        if (lastFetchEl) lastFetchEl.textContent = 'Refresh complete — reloading…';
+        setTimeout(() => location.reload(), 1000);
+      } else if (polls >= 60) {
+        clearInterval(poll);
+        if (lastFetchEl) lastFetchEl.textContent = 'Refresh timed out — reload manually';
       }
-    }, 5000);
-    // Give up after 3 minutes and let user reload manually
-    setTimeout(() => {
-      clearInterval(poll);
-      btn.disabled = false;
-      btn.textContent = '↻ Refresh Data';
-    }, 180000);
+    }, 10000);
   } catch (err) {
     btn.disabled = false;
     btn.textContent = '↻ Refresh Data';
@@ -1652,18 +1655,25 @@ async function selectSearchResult(placeId, el, name) {
     ]);
     if (hotel.error) throw new Error(hotel.error);
     let taData = null;
-    if (Array.isArray(taResults) && taResults.length > 0) {
-      taData = await fetch(`/api/ta-hotel?locationId=${encodeURIComponent(taResults[0].locationId)}`).then(r => r.json()).catch(() => null);
-      if (taData?.error) taData = null;
+    let taError = null;
+    if (Array.isArray(taResults)) {
+      if (taResults.length > 0) {
+        const taDetail = await fetch(`/api/ta-hotel?locationId=${encodeURIComponent(taResults[0].locationId)}`).then(r => r.json()).catch(err => ({ error: err.message }));
+        if (taDetail?.error) taError = taDetail.error;
+        else taData = taDetail;
+      }
+      // length 0 means hotel simply not found on TA — no error shown
+    } else {
+      taError = taResults?.error || 'TripAdvisor search failed';
     }
-    renderSearchOverview(hotel, taData);
+    renderSearchOverview(hotel, taData, taError);
   } catch (err) {
     document.getElementById('overview-content').innerHTML =
       `<div style="padding:32px;color:var(--red);">Failed to load: ${escHtml(err.message)}</div>`;
   }
 }
 
-function renderSearchOverview(hotel, taData) {
+function renderSearchOverview(hotel, taData, taError) {
   activeSearchReviewSource = 'all';
   currentSearchHotel = { ...hotel, tripadvisor: taData };
   const googlePhotos = hotel.photos || [];
@@ -1720,6 +1730,10 @@ function renderSearchOverview(hotel, taData) {
           <div class="rating-count">${taData.numReviews || 0} reviews</div>
           ${taSubratingHtml ? `<div class="subratings">${taSubratingHtml}</div>` : ''}
           ${taData.rankingString ? `<div class="ranking-badge">${escHtml(taData.rankingString)}</div>` : ''}
+        </div>` : taError ? `
+        <div class="rating-block">
+          <div class="rating-source ta">TripAdvisor</div>
+          <div style="color:var(--red);font-size:11px;margin-top:8px;line-height:1.5;">⚠ ${escHtml(taError)}</div>
         </div>` : ''}
       </div>
     </div>
