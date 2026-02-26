@@ -101,43 +101,53 @@ async function fetchHotelDetails(placeId) {
 async function fetchTAHotelDetails(locationId) {
   const apiKey = process.env.TRIPADVISOR_API_KEY;
   if (!apiKey) throw new Error('TripAdvisor API key not configured');
-  const base = 'https://api.content.tripadvisor.com/api/v1';
-  const headers = { 'X-TripAdvisor-API-Key': apiKey, accept: 'application/json' };
-  const [detRes, revRes, photoRes] = await Promise.all([
-    axios.get(`${base}/location/${locationId}/details`, { params: { language: 'en', currency: 'USD' }, headers }),
-    axios.get(`${base}/location/${locationId}/reviews`, { params: { language: 'en', limit: 5 }, headers }),
-    axios.get(`${base}/location/${locationId}/photos`,  { params: { language: 'en', limit: 20 }, headers }),
-  ]);
-  const d = detRes.data;
-  const subratings = d.subratings
-    ? Object.fromEntries(Object.entries(d.subratings).map(([k, v]) => [k, { name: v.localized_name, value: parseFloat(v.value) }]))
-    : {};
-  return {
-    locationId,
-    tripadvisorUrl: d.web_url,
-    name: d.name,
-    address: d.address_obj?.address_string,
-    rating: parseFloat(d.rating) || null,
-    numReviews: d.num_reviews,
-    rankingString: d.ranking_data?.ranking_string,
-    priceLevel: d.price_level,
-    subratings,
-    reviews: (revRes.data?.data || []).map(rv => ({
-      id: rv.id, title: rv.title, text: rv.text, rating: rv.rating,
-      publishedDate: rv.published_date, helpfulVotes: rv.helpful_votes,
-      tripType: rv.trip_type, travelDate: rv.travel_date,
-      user: { username: rv.user?.username, userLocation: rv.user?.user_location?.name },
-      url: rv.url,
-    })),
-    photos: (photoRes.data?.data || []).map(ph => ({
-      id: ph.id, caption: ph.caption,
-      images: {
-        thumbnail: ph.images?.thumbnail?.url, small: ph.images?.small?.url,
-        medium: ph.images?.medium?.url, large: ph.images?.large?.url,
-        original: ph.images?.original?.url,
-      },
-    })),
-  };
+  // Key must be passed as ?key= query param (same as fetch-tripadvisor.js batch script)
+  const taClient = axios.create({
+    baseURL: 'https://api.content.tripadvisor.com/api/v1',
+    headers: { accept: 'application/json' },
+    params: { key: apiKey },
+  });
+  try {
+    const [detRes, revRes, photoRes] = await Promise.all([
+      taClient.get(`/location/${locationId}/details`, { params: { language: 'en', currency: 'USD' } }),
+      taClient.get(`/location/${locationId}/reviews`, { params: { language: 'en', limit: 5 } }),
+      taClient.get(`/location/${locationId}/photos`,  { params: { language: 'en', limit: 20 } }),
+    ]);
+    const d = detRes.data;
+    const subratings = d.subratings
+      ? Object.fromEntries(Object.entries(d.subratings).map(([k, v]) => [k, { name: v.localized_name, value: parseFloat(v.value) }]))
+      : {};
+    return {
+      locationId,
+      tripadvisorUrl: d.web_url,
+      name: d.name,
+      address: d.address_obj?.address_string,
+      rating: parseFloat(d.rating) || null,
+      numReviews: d.num_reviews,
+      rankingString: d.ranking_data?.ranking_string,
+      priceLevel: d.price_level,
+      subratings,
+      reviews: (revRes.data?.data || []).map(rv => ({
+        id: rv.id, title: rv.title, text: rv.text, rating: rv.rating,
+        publishedDate: rv.published_date, helpfulVotes: rv.helpful_votes,
+        tripType: rv.trip_type, travelDate: rv.travel_date,
+        user: { username: rv.user?.username, userLocation: rv.user?.user_location?.name },
+        url: rv.url,
+      })),
+      photos: (photoRes.data?.data || []).map(ph => ({
+        id: ph.id, caption: ph.caption,
+        images: {
+          thumbnail: ph.images?.thumbnail?.url, small: ph.images?.small?.url,
+          medium: ph.images?.medium?.url, large: ph.images?.large?.url,
+          original: ph.images?.original?.url,
+        },
+      })),
+    };
+  } catch (err) {
+    const msg = err.response?.data?.message || err.response?.data?.error
+      || `${err.message}${err.response?.status ? ` (HTTP ${err.response.status})` : ''}`;
+    throw new Error(msg);
+  }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -214,9 +224,13 @@ app.get('/api/ta-search', async (req, res) => {
   const apiKey = process.env.TRIPADVISOR_API_KEY;
   if (!apiKey) return res.status(503).json({ error: 'TripAdvisor API key not configured' });
   try {
-    const r = await axios.get('https://api.content.tripadvisor.com/api/v1/location/search', {
+    const taClient = axios.create({
+      baseURL: 'https://api.content.tripadvisor.com/api/v1',
+      headers: { accept: 'application/json' },
+      params: { key: apiKey },
+    });
+    const r = await taClient.get('/location/search', {
       params: { searchQuery: q, category: 'hotels', language: 'en' },
-      headers: { 'X-TripAdvisor-API-Key': apiKey, accept: 'application/json' },
     });
     res.json((r.data?.data || []).slice(0, 5).map(x => ({
       locationId: x.location_id,
@@ -224,7 +238,8 @@ app.get('/api/ta-search', async (req, res) => {
       address: x.address_obj?.address_string || '',
     })));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const detail = err.response?.data?.message || err.response?.data?.error || err.message;
+    res.status(500).json({ error: typeof detail === 'string' ? detail : JSON.stringify(detail) });
   }
 });
 
