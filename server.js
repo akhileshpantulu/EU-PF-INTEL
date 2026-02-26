@@ -14,7 +14,14 @@ import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import open from 'open';
 import axios from 'axios';
+import Anthropic from '@anthropic-ai/sdk';
 import { main as runFetch } from './scripts/fetch-all.js';
+
+function getClaudeClient() {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey === 'your_anthropic_api_key_here') return null;
+  return new Anthropic({ apiKey });
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -151,22 +158,27 @@ async function fetchTAHotelDetails(locationId) {
   }
 }
 
-async function lookupRoomsViaGemini(name, address) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
-    console.log('[Gemini] No API key configured — skipping room lookup');
+async function lookupRoomsViaClaude(name, address) {
+  const claude = getClaudeClient();
+  if (!claude) {
+    console.log('[Claude] No API key configured — skipping room lookup');
     return null;
   }
   const prompt = `You are a hotel industry database. What is the exact total number of guest rooms (keys) at "${name}" located at "${address}"? Think carefully — recall the specific property, not a similar-named one. Reply with ONLY a single integer (e.g. 316). If you cannot find this specific property with confidence, reply with the single word null.`;
-  const res = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 1, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 8192 } } },
-    { headers: { 'Content-Type': 'application/json' } }
-  );
-  const raw = res.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-  console.log(`[Gemini] raw response for "${name}": "${raw}"`);
-  const n = parseInt(raw);
-  return Number.isFinite(n) && n > 0 ? n : null;
+  try {
+    const res = await claude.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 64,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const raw = res.content[0]?.text?.trim() || '';
+    console.log(`[Claude] room count for "${name}": "${raw}"`);
+    const n = parseInt(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch (err) {
+    console.error('[Claude] room lookup error:', err.message);
+    return null;
+  }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -334,7 +346,7 @@ app.post('/api/folders/:id/hotels', async (req, res) => {
     const [full, taFull, gemRooms] = await Promise.all([
       fetchHotelDetails(placeId),
       taLocationId ? fetchTAHotelDetails(taLocationId).catch(() => null) : Promise.resolve(null),
-      lookupRoomsViaGemini(name || '', address || '').catch(() => null),
+      lookupRoomsViaClaude(name || '', address || '').catch(() => null),
     ]);
     const now = new Date().toISOString();
     const hotel = {
@@ -407,7 +419,7 @@ app.get('/api/rooms-lookup', async (req, res) => {
   const { name, address } = req.query;
   if (!name) return res.status(400).json({ error: 'name required' });
   try {
-    const numRooms = await lookupRoomsViaGemini(name, address || '');
+    const numRooms = await lookupRoomsViaClaude(name, address || '');
     res.json({ numRooms });
   } catch (err) {
     console.error('[Gemini] rooms-lookup error:', err.response?.data || err.message);
@@ -415,33 +427,42 @@ app.get('/api/rooms-lookup', async (req, res) => {
   }
 });
 
-// GET /api/test-gemini — diagnostic: make a real Gemini call and return raw response
-app.get('/api/test-gemini', async (req, res) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
-    return res.json({ error: 'GEMINI_API_KEY not set or still placeholder', keyPresent: false });
+// GET /api/test-claude — diagnostic: make a real Claude call and return raw response
+app.get('/api/test-claude', async (req, res) => {
+  const claude = getClaudeClient();
+  if (!claude) {
+    return res.json({ error: 'ANTHROPIC_API_KEY not set or still placeholder', keyPresent: false });
   }
   try {
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      { contents: [{ parts: [{ text: 'You are a hotel industry database. What is the exact total number of guest rooms (keys) at "JW Marriott Houston" located at "806 Main St, Houston, TX"? Think carefully — recall the specific property, not a similar-named one. Reply with ONLY a single integer (e.g. 316). If you cannot find this specific property with confidence, reply with the single word null.' }] }], generationConfig: { temperature: 1, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 512 } } },
-      { headers: { 'Content-Type': 'application/json' } }
-    );
-    const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-    res.json({ keyPresent: true, raw, parsed: parseInt(raw) || null, fullResponse: response.data });
+    const response = await claude.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 64,
+      messages: [{ role: 'user', content: 'You are a hotel industry database. What is the exact total number of guest rooms (keys) at "JW Marriott Houston" located at "806 Main St, Houston, TX"? Think carefully — recall the specific property, not a similar-named one. Reply with ONLY a single integer (e.g. 316). If you cannot find this specific property with confidence, reply with the single word null.' }]
+    });
+    const raw = response.content[0]?.text?.trim() || '';
+    res.json({ keyPresent: true, raw, parsed: parseInt(raw) || null });
   } catch (err) {
-    res.json({ keyPresent: true, error: err.message, geminiError: err.response?.data });
+    res.json({ keyPresent: true, error: err.message });
   }
 });
 
-// POST /api/review-analysis — Gemini-powered sentiment analysis: top 3 best + worst reviews + summary
+// POST /api/review-analysis — Claude-powered sentiment analysis: top 3 best + worst reviews + summary
 app.post('/api/review-analysis', async (req, res) => {
-  const { name, googleReviews = [], taReviews = [] } = req.body;
+  const { name, googleReviews = [], taReviews = [], folderId, placeId } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'your_gemini_api_key_here')
-    return res.json({ summary: null, top3best: [], top3worst: [] });
+  // Return disk-cached result for saved hotels
+  if (folderId && placeId) {
+    const data = loadPortfolios();
+    const folder = data.folders.find(f => f.id === folderId);
+    const hotel = folder?.hotels.find(h => h.placeId === placeId);
+    if (hotel?.cachedData?.reviewAnalysis) {
+      return res.json(hotel.cachedData.reviewAnalysis);
+    }
+  }
+
+  const claude = getClaudeClient();
+  if (!claude) return res.json({ summary: null, top3best: [], top3worst: [] });
 
   const gReviews = (googleReviews || []).slice(0, 5)
     .filter(r => r.text?.trim())
@@ -477,18 +498,30 @@ Return a JSON object with EXACTLY this structure:
 Select the 3 most informative/representative reviews for each category. Quotes must be verbatim from the text above.`;
 
   try {
-    const gemRes = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 1, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 512 }, responseMimeType: 'application/json' }
-      },
-      { headers: { 'Content-Type': 'application/json' } }
-    );
-    const raw = gemRes.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '{}';
-    res.json(JSON.parse(raw));
+    const claudeRes = await claude.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const raw = claudeRes.content[0]?.text?.trim() || '{}';
+    const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+    const result = JSON.parse(cleaned);
+
+    // Persist to disk for saved hotels so next view is instant
+    if (folderId && placeId) {
+      const data = loadPortfolios();
+      const folder = data.folders.find(f => f.id === folderId);
+      const hotel = folder?.hotels.find(h => h.placeId === placeId);
+      if (hotel) {
+        hotel.cachedData = hotel.cachedData || {};
+        hotel.cachedData.reviewAnalysis = result;
+        savePortfolios(data);
+      }
+    }
+
+    res.json(result);
   } catch (err) {
-    console.error('[Gemini] review-analysis error:', err.response?.data || err.message);
+    console.error('[Claude] review-analysis error:', err.message);
     res.json({ summary: null, top3best: [], top3worst: [] });
   }
 });
@@ -498,7 +531,7 @@ app.get('/api/status', (req, res) => {
   res.json({
     google: !!(process.env.GOOGLE_PLACES_API_KEY && process.env.GOOGLE_PLACES_API_KEY !== 'your_google_places_api_key_here'),
     tripadvisor: !!(process.env.TRIPADVISOR_API_KEY && process.env.TRIPADVISOR_API_KEY !== 'your_tripadvisor_api_key_here'),
-    gemini: !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'),
+    claude: !!(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your_anthropic_api_key_here'),
     github: !!(process.env.GITHUB_TOKEN && process.env.GITHUB_REPO),
   });
 });
