@@ -24,7 +24,7 @@ if (fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf8');
   envContent.split('\n').forEach(line => {
     const [key, ...val] = line.split('=');
-    if (key && !key.startsWith('#')) process.env[key.trim()] = val.join('=').trim();
+    if (key && !key.startsWith('#') && !process.env[key.trim()]) process.env[key.trim()] = val.join('=').trim();
   });
 }
 
