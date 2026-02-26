@@ -153,7 +153,10 @@ async function fetchTAHotelDetails(locationId) {
 
 async function lookupRoomsViaGemini(name, address) {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'your_gemini_api_key_here') return null;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+    console.log('[Gemini] No API key configured — skipping room lookup');
+    return null;
+  }
   const prompt = `How many total guest rooms (keys) does the hotel "${name}" at "${address}" have? Reply with ONLY an integer. If you are not confident or the hotel is unknown, reply with null.`;
   const res = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -161,6 +164,7 @@ async function lookupRoomsViaGemini(name, address) {
     { headers: { 'Content-Type': 'application/json' } }
   );
   const raw = res.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  console.log(`[Gemini] raw response for "${name}": "${raw}"`);
   const n = parseInt(raw);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
@@ -403,8 +407,28 @@ app.get('/api/rooms-lookup', async (req, res) => {
   try {
     const numRooms = await lookupRoomsViaGemini(name, address || '');
     res.json({ numRooms });
-  } catch {
+  } catch (err) {
+    console.error('[Gemini] rooms-lookup error:', err.response?.data || err.message);
     res.json({ numRooms: null }); // fail gracefully — never block the UI
+  }
+});
+
+// GET /api/test-gemini — diagnostic: make a real Gemini call and return raw response
+app.get('/api/test-gemini', async (req, res) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+    return res.json({ error: 'GEMINI_API_KEY not set or still placeholder', keyPresent: false });
+  }
+  try {
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      { contents: [{ parts: [{ text: 'How many rooms does the JW Marriott Houston at 806 Main St, Houston, TX have? Reply with ONLY an integer.' }] }], generationConfig: { temperature: 0, maxOutputTokens: 16 } },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    res.json({ keyPresent: true, raw, parsed: parseInt(raw) || null, fullResponse: response.data });
+  } catch (err) {
+    res.json({ keyPresent: true, error: err.message, geminiError: err.response?.data });
   }
 });
 
