@@ -160,7 +160,7 @@ async function lookupRoomsViaGemini(name, address) {
   const prompt = `How many total guest rooms (keys) does the hotel "${name}" at "${address}" have? Reply with ONLY an integer. If you are not confident or the hotel is unknown, reply with null.`;
   const res = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0, maxOutputTokens: 16 } },
+    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0, maxOutputTokens: 64, thinkingConfig: { thinkingBudget: 0 } } },
     { headers: { 'Content-Type': 'application/json' } }
   );
   const raw = res.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
@@ -422,7 +422,7 @@ app.get('/api/test-gemini', async (req, res) => {
   try {
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      { contents: [{ parts: [{ text: 'How many rooms does the JW Marriott Houston at 806 Main St, Houston, TX have? Reply with ONLY an integer.' }] }], generationConfig: { temperature: 0, maxOutputTokens: 16 } },
+      { contents: [{ parts: [{ text: 'How many rooms does the JW Marriott Houston at 806 Main St, Houston, TX have? Reply with ONLY an integer.' }] }], generationConfig: { temperature: 0, maxOutputTokens: 64, thinkingConfig: { thinkingBudget: 0 } } },
       { headers: { 'Content-Type': 'application/json' } }
     );
     const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
