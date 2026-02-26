@@ -1358,7 +1358,12 @@ function renderSavedHotelOverview(hotel) {
       <div class="property-title-row">
         <div>
           <div style="margin-bottom:8px;"><span class="cached-badge">📁 ${escHtml(hotel.folderName)}</span></div>
-          <div class="property-title">${escHtml(hotel.name)}</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="property-title">${escHtml(hotel.name)}</div>
+            ${hotel.numRooms
+              ? `<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:#a5b4fc;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:500;">🏨 ${hotel.numRooms} rooms</span>`
+              : `<span id="rooms-gem" style="display:inline-flex;align-items:center;gap:4px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:#a5b4fc;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:500;">🏨 <span id="rooms-gem-val" style="font-style:italic;opacity:0.7;">looking up…</span></span>`}
+          </div>
           <div class="property-location"><span>📍</span><span>${escHtml(hotel.address || '')}</span></div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-start;">
@@ -1384,9 +1389,6 @@ function renderSavedHotelOverview(hotel) {
           <div class="rating-main"><span class="rating-number ta">${ta.rating || '—'}</span><span class="rating-max">/ 5</span></div>
           <div class="stars-row">${starsHtml(ta.rating || 0)}</div>
           <div class="rating-count">${ta.numReviews || 0} reviews</div>
-          ${hotel.numRooms
-            ? `<div class="rating-count" style="margin-top:4px;">🏨 ${hotel.numRooms} rooms</div>`
-            : `<div id="rooms-gem" class="rating-count" style="margin-top:4px;">🏨 <span id="rooms-gem-val" style="font-style:italic;color:var(--text-muted);">looking up…</span></div>`}
           ${taSubratingHtml ? `<div class="subratings">${taSubratingHtml}</div>` : ''}
           ${ta.rankingString ? `<div class="ranking-badge">${escHtml(ta.rankingString)}</div>` : ''}
         </div>` : ''}
@@ -1717,7 +1719,10 @@ function renderSearchOverview(hotel, taData, taError) {
       <div class="property-title-row">
         <div>
           <div style="margin-bottom:8px;"><span class="brand-tag">Search Result</span></div>
-          <div class="property-title">${escHtml(hotel.name)}</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="property-title">${escHtml(hotel.name)}</div>
+            <span id="rooms-gem" style="display:inline-flex;align-items:center;gap:4px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:#a5b4fc;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:500;">🏨 <span id="rooms-gem-val" style="font-style:italic;opacity:0.7;">looking up…</span></span>
+          </div>
           <div class="property-location"><span>📍</span><span>${escHtml(hotel.address || '')}</span></div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-start;">
@@ -1748,7 +1753,6 @@ function renderSearchOverview(hotel, taData, taError) {
           </div>
           <div class="stars-row">${starsHtml(taData.rating || 0)}</div>
           <div class="rating-count">${taData.numReviews || 0} reviews</div>
-          <div id="rooms-gem" class="rating-count" style="margin-top:4px;">🏨 <span id="rooms-gem-val" style="font-style:italic;color:var(--text-muted);">looking up…</span></div>
           ${taSubratingHtml ? `<div class="subratings">${taSubratingHtml}</div>` : ''}
           ${taData.rankingString ? `<div class="ranking-badge">${escHtml(taData.rankingString)}</div>` : ''}
         </div>` : taError ? `
@@ -2295,7 +2299,7 @@ async function fetchAndDisplayRooms(name, address) {
     if (numRooms) {
       el.textContent = `${numRooms} rooms`;
       el.style.fontStyle = 'normal';
-      el.style.color = 'var(--text)';
+      el.style.opacity = '1';
     } else {
       document.getElementById('rooms-gem')?.remove();
     }
