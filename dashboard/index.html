@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
     :root {
@@ -876,6 +878,26 @@
     .refresh-btn { padding: 7px 12px; background: var(--surface2); border: 1px solid var(--border-light); color: var(--text-dim); border-radius: var(--radius-sm); font-family: inherit; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: border-color 0.15s, color 0.15s; }
     .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
     .refresh-btn.spinning { opacity: 0.6; pointer-events: none; }
+
+    /* ─── FOLDER OVERVIEW ─── */
+    .folder-overview-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .top-bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .ranking-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .ranking-card-title { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; }
+    .ranking-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; transition: color 0.12s; }
+    .ranking-row:last-child { border-bottom: none; }
+    .ranking-row:hover { color: var(--accent); }
+    .ranking-pos { font-size: 16px; font-weight: 700; font-family: 'DM Serif Display', serif; color: var(--text-muted); width: 24px; flex-shrink: 0; }
+    .ranking-name { flex: 1; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ranking-score { font-size: 14px; font-weight: 700; flex-shrink: 0; }
+    /* ─── FOLDER MAP ─── */
+    #folder-map { height: 380px; border-radius: var(--radius-sm); overflow: hidden; }
+    .folder-map-marker { background: var(--accent); border: 2px solid rgba(255,255,255,0.9); border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+    .leaflet-popup-content-wrapper { background: var(--surface) !important; border: 1px solid var(--border-light) !important; border-radius: var(--radius) !important; color: var(--text) !important; font-family: 'DM Sans', sans-serif !important; box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; }
+    .leaflet-popup-tip { background: var(--surface) !important; }
+    .leaflet-popup-close-button { color: var(--text-muted) !important; }
+    .leaflet-control-zoom a { background: var(--surface) !important; border-color: var(--border) !important; color: var(--text-dim) !important; }
+    .folder-header-left { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -891,7 +913,6 @@
   </div>
   <div class="header-right">
     <span class="last-fetch" id="last-fetch">Loading...</span>
-    <a href="./map.html" style="padding:6px 14px;background:rgba(200,169,110,0.1);border:1px solid rgba(200,169,110,0.25);color:#c8a96e;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;">Portfolio Map</a>
     <span class="badge badge-google" id="google-badge">Google</span>
     <span class="badge badge-ta" id="ta-badge">TripAdvisor</span>
   </div>
@@ -916,15 +937,7 @@
       </select>
     </div>
 
-    <div style="padding: 8px 16px; margin-top: 4px;">
-      <button
-        onclick="showPortfolio()"
-        style="width:100%;padding:8px;background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:var(--accent);border-radius:var(--radius-sm);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.04em;cursor:pointer;text-transform:uppercase;">
-        📊 Portfolio Overview
-      </button>
-    </div>
-
-    <div class="sidebar-section" id="list-label" style="margin-top:8px;">Portfolio</div>
+    <div class="sidebar-section" id="list-label" style="margin-top:8px;">Properties</div>
     <div class="property-list" id="property-list">
       <div class="loading"><div class="spinner"></div></div>
     </div>
@@ -946,6 +959,11 @@
   <!-- Main -->
   <div class="main" id="main">
 
+    <!-- Folder Overview -->
+    <div id="view-folder-overview" style="display:none;">
+      <div id="folder-overview-content"></div>
+    </div>
+
     <!-- Portfolio Overview Table -->
     <div id="view-portfolio">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
@@ -965,9 +983,8 @@
       <div class="welcome-icon">🏨</div>
       <div class="welcome-title">Select a Property</div>
       <div class="welcome-text">
-        Choose a hotel from the sidebar to view its Google and TripAdvisor
-        reviews, photos, and ratings. Or click <strong>Portfolio Overview</strong> to
-        compare all 18 properties at once.
+        Choose a property from the sidebar, search for any hotel, or click a
+        <strong>saved folder</strong> to see its portfolio overview with top &amp; bottom rankings and a map.
       </div>
       <div style="margin-top:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);max-width:400px;text-align:left;">
         <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">No data yet?</div>
@@ -1003,6 +1020,8 @@ let lightboxIdx = 0;
 let folders = [];
 let activeFolderStates = {};
 let selectedFolderHotel = null;
+let selectedFolder = null;
+let currentFolderMap = null;
 let currentSearchHotel = null;
 
 // ─────────────────────────────────────────
@@ -1010,9 +1029,10 @@ let currentSearchHotel = null;
 // ─────────────────────────────────────────
 async function init() {
   try {
-    const [meta, data] = await Promise.all([
+    const [meta, data, status] = await Promise.all([
       fetch('/api/metadata').then(r => r.json()).catch(() => ({})),
-      fetch('/api/portfolio').then(r => r.json()).catch(() => [])
+      fetch('/api/portfolio').then(r => r.json()).catch(() => []),
+      fetch('/api/status').then(r => r.json()).catch(() => ({})),
     ]);
 
     // Update header
@@ -1032,6 +1052,15 @@ async function init() {
     if (meta.taSuccess !== undefined) {
       document.getElementById('ta-badge').textContent =
         `TripAdvisor ${meta.taSuccess}/${meta.propertyCount}`;
+    }
+
+    // TripAdvisor key diagnostic
+    if (status.tripadvisor === false) {
+      const taBadge = document.getElementById('ta-badge');
+      taBadge.textContent = 'TripAdvisor: key missing';
+      taBadge.style.background = 'rgba(251,146,60,0.1)';
+      taBadge.style.color = '#fb923c';
+      taBadge.style.borderColor = 'rgba(251,146,60,0.3)';
     }
 
     if (!Array.isArray(data) || data.length === 0) {
@@ -1077,9 +1106,9 @@ function renderFolders() {
     const isOpen = activeFolderStates[f.id] !== false;
     return `
       <div class="folder-group" id="folder-group-${escHtml(f.id)}">
-        <div class="folder-header" onclick="toggleFolder('${escHtml(f.id)}')">
-          <div class="folder-header-left">
-            <span class="folder-chevron ${isOpen ? 'open' : ''}">▶</span>
+        <div class="folder-header">
+          <div class="folder-header-left" onclick="selectFolder('${escHtml(f.id)}')">
+            <span class="folder-chevron ${isOpen ? 'open' : ''}" onclick="event.stopPropagation(); toggleFolder('${escHtml(f.id)}')">▶</span>
             <span class="folder-name" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
             <span class="folder-count">(${f.hotels.length})</span>
           </div>
@@ -1235,9 +1264,9 @@ function saveDropdownNewFolder() {
 async function selectSavedHotel(folderId, placeId) {
   selectedFolderHotel = { folderId, placeId };
   selectedId = null;
+  selectedFolder = null;
   renderFolders();
-  document.getElementById('view-welcome').style.display = 'none';
-  document.getElementById('view-portfolio').style.display = 'none';
+  hideAllViews();
   document.getElementById('view-overview').style.display = 'block';
   document.getElementById('overview-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
@@ -1318,6 +1347,91 @@ async function removeFromFolder(folderId, placeId, hotelName) {
   } catch (err) {
     alert('Failed to remove: ' + err.message);
   }
+}
+
+// ─────────────────────────────────────────
+//  Folder Overview
+// ─────────────────────────────────────────
+function selectFolder(folderId) {
+  const folder = folders.find(f => f.id === folderId);
+  if (!folder) return;
+  selectedFolder = folderId;
+  selectedId = null;
+  selectedFolderHotel = null;
+  activeFolderStates[folderId] = true;
+  renderFolders();
+  hideAllViews();
+  document.getElementById('view-folder-overview').style.display = 'block';
+  renderFolderOverview(folder);
+}
+
+function renderFolderOverview(folder) {
+  const hotels = folder.hotels;
+  const rated = hotels.filter(h => h.rating);
+  const top5 = [...rated].sort((a, b) => b.rating - a.rating).slice(0, 5);
+  const bot5 = [...rated].sort((a, b) => a.rating - b.rating).slice(0, 5);
+  const hasMap = hotels.some(h => h.lat && h.lng);
+
+  const rankRow = (h, i, scoreColor) => `
+    <div class="ranking-row" onclick="selectSavedHotel('${escHtml(folder.id)}','${escHtml(h.placeId)}')">
+      <span class="ranking-pos">${i + 1}</span>
+      <span class="ranking-name" title="${escHtml(h.name)}">${escHtml(h.name)}</span>
+      <span class="ranking-score" style="color:${scoreColor};">★ ${h.rating}</span>
+    </div>`;
+
+  document.getElementById('folder-overview-content').innerHTML = `
+    <div class="folder-overview-header">
+      <h2 style="font-family:'DM Serif Display',serif;font-size:22px;">${escHtml(folder.name)}</h2>
+      <span style="font-size:13px;color:var(--text-muted);">${hotels.length} hotel${hotels.length !== 1 ? 's' : ''}</span>
+    </div>
+    ${hotels.length === 0
+      ? `<div style="padding:48px;text-align:center;color:var(--text-muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">No hotels saved yet — search for a hotel and save it to this folder.</div>`
+      : `<div class="top-bottom-grid">
+          <div class="ranking-card">
+            <div class="ranking-card-title">⬆ Top ${top5.length} by Rating</div>
+            ${top5.map((h, i) => rankRow(h, i, 'var(--google-green)')).join('')}
+          </div>
+          <div class="ranking-card">
+            <div class="ranking-card-title">⬇ Bottom ${bot5.length} by Rating</div>
+            ${bot5.map((h, i) => rankRow(h, i, 'var(--red)')).join('')}
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+          <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;">📍 Folder Map</div>
+          ${hasMap
+            ? `<div id="folder-map"></div>`
+            : `<div style="padding:32px;text-align:center;color:var(--text-muted);font-size:13px;">No location data yet — use ↻ Refresh on each hotel to add it to the map.</div>`}
+        </div>`
+    }`;
+
+  if (hasMap) setTimeout(() => initFolderMap(hotels), 0);
+}
+
+function initFolderMap(hotels) {
+  if (currentFolderMap) { currentFolderMap.remove(); currentFolderMap = null; }
+  const mapEl = document.getElementById('folder-map');
+  if (!mapEl) return;
+  const withCoords = hotels.filter(h => h.lat && h.lng);
+  if (!withCoords.length) return;
+
+  currentFolderMap = L.map('folder-map');
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd', maxZoom: 19,
+  }).addTo(currentFolderMap);
+
+  const icon = L.divIcon({ className: 'folder-map-marker', iconSize: [12, 12], iconAnchor: [6, 6], popupAnchor: [0, -10] });
+
+  withCoords.forEach(h => {
+    const popup = `
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">${escHtml(h.name)}</div>
+      <div style="font-size:11px;color:#8891a8;margin-bottom:6px;">${escHtml(h.address || '')}</div>
+      ${h.rating ? `<div style="color:#4ade80;font-weight:600;">★ ${h.rating} · ${(h.totalRatings || 0).toLocaleString()} reviews</div>` : ''}`;
+    L.marker([h.lat, h.lng], { icon }).bindPopup(popup, { maxWidth: 260 }).addTo(currentFolderMap);
+  });
+
+  const group = L.featureGroup(withCoords.map(h => L.marker([h.lat, h.lng])));
+  currentFolderMap.fitBounds(group.getBounds().pad(0.3));
 }
 
 function timeAgo(date) {
@@ -1546,26 +1660,32 @@ function renderSearchReviews(reviews) {
 // ─────────────────────────────────────────
 //  Views
 // ─────────────────────────────────────────
-function showWelcome() {
-  document.getElementById('view-welcome').style.display = 'flex';
+function hideAllViews() {
+  document.getElementById('view-welcome').style.display = 'none';
   document.getElementById('view-overview').style.display = 'none';
   document.getElementById('view-portfolio').style.display = 'none';
+  document.getElementById('view-folder-overview').style.display = 'none';
+}
+
+function showWelcome() {
+  hideAllViews();
+  document.getElementById('view-welcome').style.display = 'flex';
 }
 
 function showPortfolio() {
   selectedId = null;
   renderSidebar();
-  document.getElementById('view-welcome').style.display = 'none';
-  document.getElementById('view-overview').style.display = 'none';
+  hideAllViews();
   document.getElementById('view-portfolio').style.display = 'block';
   renderPortfolioTable();
 }
 
 function selectProperty(id) {
   selectedId = id;
+  selectedFolder = null;
+  selectedFolderHotel = null;
   renderSidebar();
-  document.getElementById('view-welcome').style.display = 'none';
-  document.getElementById('view-portfolio').style.display = 'none';
+  hideAllViews();
   document.getElementById('view-overview').style.display = 'block';
   renderPropertyOverview(id);
 }
