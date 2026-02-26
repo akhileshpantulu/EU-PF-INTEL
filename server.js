@@ -97,6 +97,48 @@ async function fetchHotelDetails(placeId) {
     }))
   };
 }
+
+async function fetchTAHotelDetails(locationId) {
+  const apiKey = process.env.TRIPADVISOR_API_KEY;
+  if (!apiKey) throw new Error('TripAdvisor API key not configured');
+  const base = 'https://api.content.tripadvisor.com/api/v1';
+  const headers = { 'X-TripAdvisor-API-Key': apiKey, accept: 'application/json' };
+  const [detRes, revRes, photoRes] = await Promise.all([
+    axios.get(`${base}/location/${locationId}/details`, { params: { language: 'en', currency: 'USD' }, headers }),
+    axios.get(`${base}/location/${locationId}/reviews`, { params: { language: 'en', limit: 5 }, headers }),
+    axios.get(`${base}/location/${locationId}/photos`,  { params: { language: 'en', limit: 20 }, headers }),
+  ]);
+  const d = detRes.data;
+  const subratings = d.subratings
+    ? Object.fromEntries(Object.entries(d.subratings).map(([k, v]) => [k, { name: v.localized_name, value: parseFloat(v.value) }]))
+    : {};
+  return {
+    locationId,
+    tripadvisorUrl: d.web_url,
+    name: d.name,
+    address: d.address_obj?.address_string,
+    rating: parseFloat(d.rating) || null,
+    numReviews: d.num_reviews,
+    rankingString: d.ranking_data?.ranking_string,
+    priceLevel: d.price_level,
+    subratings,
+    reviews: (revRes.data?.data || []).map(rv => ({
+      id: rv.id, title: rv.title, text: rv.text, rating: rv.rating,
+      publishedDate: rv.published_date, helpfulVotes: rv.helpful_votes,
+      tripType: rv.trip_type, travelDate: rv.travel_date,
+      user: { username: rv.user?.username, userLocation: rv.user?.user_location?.name },
+      url: rv.url,
+    })),
+    photos: (photoRes.data?.data || []).map(ph => ({
+      id: ph.id, caption: ph.caption,
+      images: {
+        thumbnail: ph.images?.thumbnail?.url, small: ph.images?.small?.url,
+        medium: ph.images?.medium?.url, large: ph.images?.large?.url,
+        original: ph.images?.original?.url,
+      },
+    })),
+  };
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PORT = parseInt(process.env.PORT || '3737');
@@ -165,6 +207,38 @@ app.get('/api/hotel', async (req, res) => {
   }
 });
 
+// API: search hotels by name on TripAdvisor
+app.get('/api/ta-search', async (req, res) => {
+  const q = req.query.q?.trim();
+  if (!q || q.length < 2) return res.json([]);
+  const apiKey = process.env.TRIPADVISOR_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'TripAdvisor API key not configured' });
+  try {
+    const r = await axios.get('https://api.content.tripadvisor.com/api/v1/location/search', {
+      params: { searchQuery: q, category: 'hotels', language: 'en' },
+      headers: { 'X-TripAdvisor-API-Key': apiKey, accept: 'application/json' },
+    });
+    res.json((r.data?.data || []).slice(0, 5).map(x => ({
+      locationId: x.location_id,
+      name: x.name,
+      address: x.address_obj?.address_string || '',
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: full TripAdvisor details for one hotel by locationId
+app.get('/api/ta-hotel', async (req, res) => {
+  const { locationId } = req.query;
+  if (!locationId) return res.status(400).json({ error: 'locationId required' });
+  try {
+    res.json(await fetchTAHotelDetails(locationId));
+  } catch (err) {
+    res.status(err.message.includes('not configured') ? 503 : 500).json({ error: err.message });
+  }
+});
+
 // API: trigger re-fetch (runs fetch-all in the background)
 app.post('/api/refresh', (req, res) => {
   res.status(202).json({ message: 'Refresh started.' });
@@ -211,7 +285,7 @@ app.delete('/api/folders/:id', (req, res) => {
 
 // POST /api/folders/:id/hotels — save a hotel (fetches + caches immediately)
 app.post('/api/folders/:id/hotels', async (req, res) => {
-  const { placeId, name, address, rating, totalRatings } = req.body;
+  const { placeId, name, address, rating, totalRatings, taLocationId } = req.body;
   if (!placeId) return res.status(400).json({ error: 'placeId required' });
   const data = loadPortfolios();
   const folder = data.folders.find(f => f.id === req.params.id);
@@ -220,14 +294,17 @@ app.post('/api/folders/:id/hotels', async (req, res) => {
     return res.status(409).json({ error: 'Hotel already in folder' });
   }
   try {
-    const full = await fetchHotelDetails(placeId);
+    const [full, taFull] = await Promise.all([
+      fetchHotelDetails(placeId),
+      taLocationId ? fetchTAHotelDetails(taLocationId).catch(() => null) : Promise.resolve(null),
+    ]);
     const now = new Date().toISOString();
     const hotel = {
       placeId, name: full.name || name, address: full.address || address,
       rating: full.rating ?? rating, totalRatings: full.totalRatings ?? totalRatings,
       lat: full.lat, lng: full.lng,
       savedAt: now, lastFetched: now,
-      cachedData: { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos }
+      cachedData: { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos, tripadvisor: taFull }
     };
     folder.hotels.push(hotel);
     savePortfolios(data);
@@ -258,13 +335,17 @@ app.post('/api/folders/:folderId/hotels/:placeId/refresh', async (req, res) => {
   const hotel = folder.hotels.find(h => h.placeId === req.params.placeId);
   if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
   try {
-    const full = await fetchHotelDetails(req.params.placeId);
+    const taLocationId = hotel.cachedData?.tripadvisor?.locationId;
+    const [full, taFull] = await Promise.all([
+      fetchHotelDetails(req.params.placeId),
+      taLocationId ? fetchTAHotelDetails(taLocationId).catch(() => null) : Promise.resolve(null),
+    ]);
     hotel.rating = full.rating;
     hotel.totalRatings = full.totalRatings;
     hotel.lat = full.lat;
     hotel.lng = full.lng;
     hotel.lastFetched = new Date().toISOString();
-    hotel.cachedData = { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos };
+    hotel.cachedData = { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos, tripadvisor: taFull || hotel.cachedData?.tripadvisor };
     savePortfolios(data);
     res.json({ ok: true, lastFetched: hotel.lastFetched });
   } catch (err) {
