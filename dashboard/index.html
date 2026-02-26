@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio Intel — Review Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #0c0f14;
+      --surface: #141820;
+      --surface2: #1c2230;
+      --border: #252d3d;
+      --border-light: #2d3650;
+      --accent: #c8a96e;
+      --accent-dim: rgba(200, 169, 110, 0.15);
+      --accent-glow: rgba(200, 169, 110, 0.08);
+      --google-green: #4ade80;
+      --ta-green: #34d399;
+      --text: #e8eaf0;
+      --text-dim: #8891a8;
+      --text-muted: #4f5a72;
+      --star: #f59e0b;
+      --red: #f87171;
+      --blue: #60a5fa;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ─── HEADER ─── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .logo-text {
+      font-family: 'DM Serif Display', serif;
+      font-size: 18px;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .last-fetch {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .badge-google { background: rgba(74, 222, 128, 0.1); color: var(--google-green); border: 1px solid rgba(74, 222, 128, 0.2); }
+    .badge-ta { background: rgba(52, 211, 153, 0.1); color: var(--ta-green); border: 1px solid rgba(52, 211, 153, 0.2); }
+
+    /* ─── LAYOUT ─── */
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      height: calc(100vh - 64px);
+    }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 16px 0;
+    }
+
+    .sidebar-section {
+      padding: 8px 16px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    .filter-group {
+      padding: 8px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .search-box {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box:focus {
+      border-color: var(--accent);
+    }
+
+    .sort-select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238891a8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+
+    /* Property List */
+    .property-list {
+      padding: 8px;
+    }
+
+    .property-item {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s;
+      border: 1px solid transparent;
+    }
+
+    .property-item:hover {
+      background: var(--surface2);
+    }
+
+    .property-item.active {
+      background: var(--accent-dim);
+      border-color: rgba(200, 169, 110, 0.25);
+    }
+
+    .property-item-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .property-item.active .property-item-name {
+      color: var(--accent);
+    }
+
+    .property-item-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .property-item-city {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .mini-rating {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+    }
+
+    .mini-rating .star { color: var(--star); font-size: 9px; }
+    .mini-rating .val { color: var(--text-dim); font-weight: 600; }
+
+    .mini-rating.google .val { color: var(--google-green); }
+    .mini-rating.ta .val { color: var(--ta-green); }
+
+    /* ─── MAIN CONTENT ─── */
+    .main {
+      overflow-y: auto;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ─── SUMMARY CARDS ─── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-family: 'DM Serif Display', serif;
+      font-size: 28px;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ─── PROPERTY DETAIL ─── */
+    .property-header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+    }
+
+    .property-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .property-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 26px;
+      color: var(--text);
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+
+    .property-location {
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border-light);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: 0.04em;
+    }
+
+    .ratings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .rating-block {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+    }
+
+    .rating-source {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .rating-source.google { color: var(--google-green); }
+    .rating-source.ta { color: var(--ta-green); }
+
+    .rating-main {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .rating-number {
+      font-family: 'DM Serif Display', serif;
+      font-size: 36px;
+      line-height: 1;
+    }
+
+    .rating-number.google { color: var(--google-green); }
+    .rating-number.ta { color: var(--ta-green); }
+
+    .rating-max { font-size: 14px; color: var(--text-muted); }
+
+    .stars-row {
+      display: flex;
+      gap: 2px;
+      margin: 6px 0;
+    }
+
+    .star-icon { color: var(--star); font-size: 13px; }
+    .star-icon.empty { color: var(--text-muted); opacity: 0.4; }
+
+    .rating-count {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .subratings {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .subrating-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .subrating-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: capitalize;
+    }
+
+    .subrating-value {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-dim);
+    }
+
+    .ranking-badge {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* ─── TABS ─── */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      background: var(--surface);
+      padding: 4px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    .tab {
+      flex: 1;
+      padding: 8px 16px;
+      text-align: center;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all 0.15s;
+      border: 1px solid transparent;
+    }
+
+    .tab.active {
+      background: var(--accent-dim);
+      border-color: rgba(200, 169, 110, 0.25);
+      color: var(--accent);
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ─── REVIEWS ─── */
+    .reviews-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .source-toggle {
+      display: flex;
+      gap: 8px;
+    }
+
+    .source-btn {
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border-light);
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+
+    .source-btn.active.google { 
+      background: rgba(74, 222, 128, 0.1); 
+      border-color: rgba(74, 222, 128, 0.3); 
+      color: var(--google-green); 
+    }
+
+    .source-btn.active.ta { 
+      background: rgba(52, 211, 153, 0.1); 
+      border-color: rgba(52, 211, 153, 0.3); 
+      color: var(--ta-green); 
+    }
+
+    .reviews-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .review-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border-color 0.2s;
+    }
+
+    .review-card:hover {
+      border-color: var(--border-light);
+    }
+
+    .review-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .reviewer-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .reviewer-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--surface2);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .reviewer-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .reviewer-name {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .reviewer-location {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .review-rating-stars { display: flex; gap: 2px; }
+    .review-star { color: var(--star); font-size: 12px; }
+    .review-star.empty { color: var(--border-light); }
+
+    .review-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .review-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .review-date {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .review-trip-type {
+      font-size: 10px;
+      padding: 2px 8px;
+      background: var(--surface2);
+      border-radius: 10px;
+      color: var(--text-muted);
+      text-transform: capitalize;
+    }
+
+    .review-text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+
+    .read-more {
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: 4px;
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 48px;
+      color: var(--text-muted);
+    }
+
+    .no-data-icon { font-size: 32px; margin-bottom: 12px; }
+    .no-data-text { font-size: 14px; }
+    .no-data-hint { font-size: 12px; margin-top: 6px; color: var(--text-muted); opacity: 0.7; }
+
+    /* ─── PHOTOS ─── */
+    .photos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .photo-card {
+      aspect-ratio: 4/3;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: var(--surface2);
+      position: relative;
+      cursor: pointer;
+    }
+
+    .photo-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+
+    .photo-card:hover img {
+      transform: scale(1.05);
+    }
+
+    .photo-source-tag {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .photo-source-tag.google { background: rgba(74, 222, 128, 0.85); color: #0a1a0f; }
+    .photo-source-tag.ta { background: rgba(52, 211, 153, 0.85); color: #0a1a0f; }
+
+    .photo-caption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.7));
+      padding: 20px 10px 8px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.8);
+    }
+
+    /* ─── LIGHTBOX ─── */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lightbox.open { display: flex; }
+
+    .lightbox-img {
+      max-width: 90vw;
+      max-height: 85vh;
+      border-radius: var(--radius);
+      object-fit: contain;
+    }
+
+    .lightbox-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lightbox-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: white;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+
+    .lightbox-nav:hover { background: rgba(255,255,255,0.2); }
+    .lightbox-nav.prev { left: 20px; }
+    .lightbox-nav.next { right: 20px; }
+
+    /* ─── PORTFOLIO VIEW ─── */
+    .portfolio-table {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .portfolio-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .portfolio-table th {
+      background: var(--surface2);
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .portfolio-table th:hover { color: var(--text-dim); }
+
+    .portfolio-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      vertical-align: middle;
+    }
+
+    .portfolio-table tr:last-child td { border-bottom: none; }
+
+    .portfolio-table tr:hover td { background: var(--surface2); }
+
+    .portfolio-table tr { cursor: pointer; }
+
+    .table-name { font-weight: 500; color: var(--text); }
+    .table-city { color: var(--text-muted); font-size: 12px; }
+    .table-brand { color: var(--text-muted); font-size: 12px; }
+
+    .rating-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .rating-pill.google { background: rgba(74, 222, 128, 0.1); color: var(--google-green); }
+    .rating-pill.ta { background: rgba(52, 211, 153, 0.1); color: var(--ta-green); }
+    .rating-pill.none { background: var(--surface2); color: var(--text-muted); }
+
+    /* ─── LOADING ─── */
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 300px;
+      gap: 16px;
+      color: var(--text-muted);
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── SCROLLBAR ─── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    /* ─── EMPTY STATE ─── */
+    .welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 16px;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 48px;
+    }
+
+    .welcome-icon { font-size: 48px; margin-bottom: 8px; }
+    .welcome-title { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--text-dim); }
+    .welcome-text { font-size: 14px; line-height: 1.6; max-width: 380px; }
+
+    /* ─── VIEWS ─── */
+    #view-overview { display: none; }
+    #view-portfolio { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏨</div>
+    <div>
+      <div class="logo-text">Portfolio Intel</div>
+      <div class="logo-sub">Review Dashboard</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="last-fetch" id="last-fetch">Loading...</span>
+    <a href="./map.html" style="padding:6px 14px;background:rgba(200,169,110,0.1);border:1px solid rgba(200,169,110,0.25);color:#c8a96e;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;">Portfolio Map</a>
+    <span class="badge badge-google" id="google-badge">Google</span>
+    <span class="badge badge-ta" id="ta-badge">TripAdvisor</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="filter-group">
+      <input class="search-box" id="search" type="text" placeholder="Search properties...">
+    </div>
+
+    <div class="filter-group">
+      <select class="sort-select" id="sort-select">
+        <option value="id">Sort: Property #</option>
+        <option value="name">Sort: Name A–Z</option>
+        <option value="city">Sort: City</option>
+        <option value="google-rating">Sort: Google Rating ↓</option>
+        <option value="ta-rating">Sort: TA Rating ↓</option>
+        <option value="google-reviews">Sort: Google Reviews ↓</option>
+      </select>
+    </div>
+
+    <div style="padding: 8px 16px; margin-top: 4px;">
+      <button
+        onclick="showPortfolio()"
+        style="width:100%;padding:8px;background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:var(--accent);border-radius:var(--radius-sm);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.04em;cursor:pointer;text-transform:uppercase;">
+        📊 Portfolio Overview
+      </button>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:8px;">Properties</div>
+    <div class="property-list" id="property-list">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main" id="main">
+
+    <!-- Portfolio Overview Table -->
+    <div id="view-portfolio">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h2 style="font-family:'DM Serif Display',serif;font-size:22px;">Portfolio Overview</h2>
+        <button onclick="exportCSV()" style="padding:7px 16px;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-dim);border-radius:var(--radius-sm);font-family:inherit;font-size:12px;cursor:pointer;">Export CSV</button>
+      </div>
+      <div class="portfolio-table" id="portfolio-table-wrap"></div>
+    </div>
+
+    <!-- Property Overview -->
+    <div id="view-overview">
+      <div id="overview-content"></div>
+    </div>
+
+    <!-- Welcome State -->
+    <div id="view-welcome" class="welcome">
+      <div class="welcome-icon">🏨</div>
+      <div class="welcome-title">Select a Property</div>
+      <div class="welcome-text">
+        Choose a hotel from the sidebar to view its Google and TripAdvisor
+        reviews, photos, and ratings. Or click <strong>Portfolio Overview</strong> to
+        compare all 18 properties at once.
+      </div>
+      <div style="margin-top:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);max-width:400px;text-align:left;">
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">No data yet?</div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">
+          1. Copy <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">.env.example</code> to <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">.env</code><br>
+          2. Add your API keys to <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">.env</code><br>
+          3. Run <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">npm run fetch</code> in terminal<br>
+          4. Come back here and refresh
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <button class="lightbox-nav prev" onclick="lightboxNav(-1)">‹</button>
+  <img class="lightbox-img" id="lightbox-img" src="" alt="">
+  <button class="lightbox-nav next" onclick="lightboxNav(1)">›</button>
+</div>
+
+<script>
+// ─────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────
+let portfolio = [];
+let selectedId = null;
+let activeReviewSource = 'google';
+let lightboxPhotos = [];
+let lightboxIdx = 0;
+
+// ─────────────────────────────────────────
+//  Init
+// ─────────────────────────────────────────
+async function init() {
+  try {
+    const [meta, data] = await Promise.all([
+      fetch('/api/metadata').then(r => r.json()).catch(() => ({})),
+      fetch('/api/portfolio').then(r => r.json()).catch(() => [])
+    ]);
+
+    // Update header
+    if (meta.lastFetch) {
+      const d = new Date(meta.lastFetch);
+      document.getElementById('last-fetch').textContent =
+        'Last fetch: ' + d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) +
+        ' ' + d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+    } else {
+      document.getElementById('last-fetch').textContent = 'No data fetched yet';
+    }
+
+    if (meta.googleSuccess !== undefined) {
+      document.getElementById('google-badge').textContent =
+        `Google ${meta.googleSuccess}/${meta.propertyCount}`;
+    }
+    if (meta.taSuccess !== undefined) {
+      document.getElementById('ta-badge').textContent =
+        `TripAdvisor ${meta.taSuccess}/${meta.propertyCount}`;
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
+      portfolio = [];
+      renderSidebar();
+      showWelcome();
+      return;
+    }
+
+    portfolio = data;
+    renderSidebar();
+    showWelcome();
+
+  } catch (err) {
+    console.error('Failed to load data:', err);
+    showWelcome();
+  }
+}
+
+// ─────────────────────────────────────────
+//  Sidebar
+// ─────────────────────────────────────────
+function getFilteredSorted() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const sort = document.getElementById('sort-select').value;
+
+  let items = [...portfolio];
+
+  if (q) {
+    items = items.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.city.toLowerCase().includes(q) ||
+      p.brand.toLowerCase().includes(q) ||
+      String(p.id).includes(q)
+    );
+  }
+
+  items.sort((a, b) => {
+    switch (sort) {
+      case 'name': return a.name.localeCompare(b.name);
+      case 'city': return a.city.localeCompare(b.city);
+      case 'google-rating': {
+        const ar = a.google?.rating || 0;
+        const br = b.google?.rating || 0;
+        return br - ar;
+      }
+      case 'ta-rating': {
+        const ar = a.tripadvisor?.rating || 0;
+        const br = b.tripadvisor?.rating || 0;
+        return br - ar;
+      }
+      case 'google-reviews': {
+        const ar = a.google?.totalRatings || 0;
+        const br = b.google?.totalRatings || 0;
+        return br - ar;
+      }
+      default: return a.id - b.id;
+    }
+  });
+
+  return items;
+}
+
+function renderSidebar() {
+  const items = getFilteredSorted();
+  const list = document.getElementById('property-list');
+
+  if (items.length === 0) {
+    list.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:12px;text-align:center;">No properties match</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(p => {
+    const gRating = p.google?.rating;
+    const tRating = p.tripadvisor?.rating;
+    const isActive = p.id === selectedId;
+
+    return `
+      <div class="property-item ${isActive ? 'active' : ''}" onclick="selectProperty(${p.id})">
+        <div class="property-item-name">${p.id}. ${p.name}</div>
+        <div class="property-item-meta">
+          <span class="property-item-city">${p.city}, ${p.state}</span>
+          ${gRating ? `<span class="mini-rating google"><span class="star">★</span><span class="val">${gRating}</span></span>` : ''}
+          ${tRating ? `<span class="mini-rating ta"><span class="star">★</span><span class="val">${tRating}</span></span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('search').addEventListener('input', renderSidebar);
+document.getElementById('sort-select').addEventListener('change', renderSidebar);
+
+// ─────────────────────────────────────────
+//  Views
+// ─────────────────────────────────────────
+function showWelcome() {
+  document.getElementById('view-welcome').style.display = 'flex';
+  document.getElementById('view-overview').style.display = 'none';
+  document.getElementById('view-portfolio').style.display = 'none';
+}
+
+function showPortfolio() {
+  selectedId = null;
+  renderSidebar();
+  document.getElementById('view-welcome').style.display = 'none';
+  document.getElementById('view-overview').style.display = 'none';
+  document.getElementById('view-portfolio').style.display = 'block';
+  renderPortfolioTable();
+}
+
+function selectProperty(id) {
+  selectedId = id;
+  renderSidebar();
+  document.getElementById('view-welcome').style.display = 'none';
+  document.getElementById('view-portfolio').style.display = 'none';
+  document.getElementById('view-overview').style.display = 'block';
+  renderPropertyOverview(id);
+}
+
+// ─────────────────────────────────────────
+//  Property Overview
+// ─────────────────────────────────────────
+function starsHtml(rating, max = 5) {
+  const full = Math.round(rating);
+  return Array.from({ length: max }, (_, i) =>
+    `<span class="star-icon ${i < full ? '' : 'empty'}">★</span>`
+  ).join('');
+}
+
+function renderPropertyOverview(id) {
+  const p = portfolio.find(x => x.id === id);
+  if (!p) return;
+
+  const g = p.google;
+  const ta = p.tripadvisor;
+
+  // All photos: Google first, then TripAdvisor
+  const googlePhotos = (g?.photos || []).map(ph => ({ ...ph, source: 'google' }));
+  const taPhotos = (ta?.photos || []).map(ph => ({
+    url: ph.images?.large || ph.images?.medium || ph.images?.small || ph.images?.original,
+    source: 'ta',
+    caption: ph.caption,
+  }));
+  const allPhotos = [...googlePhotos, ...taPhotos];
+
+  const hasData = g || ta;
+
+  const subratingHtml = ta?.subratings
+    ? Object.values(ta.subratings).map(s => `
+        <div class="subrating-item">
+          <span class="subrating-label">${s.name}</span>
+          <span class="subrating-value">${s.value} <span style="color:var(--star);font-size:10px;">★</span></span>
+        </div>
+      `).join('')
+    : '';
+
+  document.getElementById('overview-content').innerHTML = `
+
+    <!-- Property Header -->
+    <div class="property-header" style="margin-bottom:20px;">
+      <div class="property-title-row">
+        <div>
+          <div style="margin-bottom:8px;">
+            <span class="brand-tag">${p.brand}</span>
+            <span style="margin-left:6px;font-size:12px;color:var(--text-muted);">#${p.id}</span>
+          </div>
+          <div class="property-title">${p.name}</div>
+          <div class="property-location">
+            <span>📍</span>
+            <span>${p.address || `${p.city}, ${p.state}`}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          ${g?.googleMapsUrl ? `<a href="${g.googleMapsUrl}" target="_blank" style="padding:7px 14px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);color:var(--google-green);border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-decoration:none;">Google Maps ↗</a>` : ''}
+          ${ta?.tripadvisorUrl ? `<a href="${ta.tripadvisorUrl}" target="_blank" style="padding:7px 14px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25);color:var(--ta-green);border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-decoration:none;">TripAdvisor ↗</a>` : ''}
+        </div>
+      </div>
+
+      ${hasData ? `
+        <div class="ratings-grid">
+          <!-- Google -->
+          <div class="rating-block">
+            <div class="rating-source google">Google Reviews</div>
+            ${g && !g.error ? `
+              <div class="rating-main">
+                <span class="rating-number google">${g.rating || '—'}</span>
+                <span class="rating-max">/ 5</span>
+              </div>
+              <div class="stars-row">${starsHtml(g.rating || 0)}</div>
+              <div class="rating-count">${(g.totalRatings || 0).toLocaleString()} reviews</div>
+            ` : `<div style="color:var(--text-muted);font-size:12px;margin-top:8px;">${g?.error || 'Not fetched'}</div>`}
+          </div>
+
+          <!-- TripAdvisor -->
+          <div class="rating-block">
+            <div class="rating-source ta">TripAdvisor</div>
+            ${ta && !ta.error ? `
+              <div class="rating-main">
+                <span class="rating-number ta">${ta.rating || '—'}</span>
+                <span class="rating-max">/ 5</span>
+              </div>
+              <div class="stars-row">${starsHtml(ta.rating || 0)}</div>
+              <div class="rating-count">${(ta.numReviews || 0).toLocaleString()} reviews</div>
+              ${subratingHtml ? `<div class="subratings">${subratingHtml}</div>` : ''}
+              ${ta.rankingString ? `<div class="ranking-badge">${ta.rankingString}</div>` : ''}
+            ` : `<div style="color:var(--text-muted);font-size:12px;margin-top:8px;">${ta?.error || 'Not fetched'}</div>`}
+          </div>
+        </div>
+      ` : `
+        <div style="margin-top:16px;padding:16px;background:var(--surface2);border-radius:var(--radius-sm);color:var(--text-muted);font-size:13px;">
+          No data available. Run <code style="background:var(--bg);padding:1px 5px;border-radius:4px;">npm run fetch</code> to load data.
+        </div>
+      `}
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" style="margin-bottom:20px;">
+      <div class="tab active" id="tab-reviews" onclick="switchTab('reviews')">Reviews</div>
+      <div class="tab" id="tab-photos" onclick="switchTab('photos')">
+        Photos ${allPhotos.length > 0 ? `<span style="opacity:0.6;font-size:11px;">(${allPhotos.length})</span>` : ''}
+      </div>
+    </div>
+
+    <!-- Reviews Tab -->
+    <div class="tab-content active" id="tab-content-reviews">
+      ${renderReviews(p)}
+    </div>
+
+    <!-- Photos Tab -->
+    <div class="tab-content" id="tab-content-photos">
+      ${renderPhotos(allPhotos)}
+    </div>
+
+  `;
+
+  // Store photos for lightbox
+  lightboxPhotos = allPhotos;
+}
+
+function renderReviews(p) {
+  const g = p.google;
+  const ta = p.tripadvisor;
+
+  const hasGoogle = g && !g.error && g.reviews?.length > 0;
+  const hasTA = ta && !ta.error && ta.reviews?.length > 0;
+
+  if (!hasGoogle && !hasTA) {
+    return `<div class="no-data">
+      <div class="no-data-icon">💬</div>
+      <div class="no-data-text">No reviews loaded yet</div>
+      <div class="no-data-hint">Run <code>npm run fetch</code> to pull review data</div>
+    </div>`;
+  }
+
+  const googleReviewsHtml = hasGoogle ? g.reviews.map(r => `
+    <div class="review-card">
+      <div class="review-header">
+        <div class="reviewer-info">
+          <div class="reviewer-avatar">
+            ${r.profilePhoto ? `<img src="${r.profilePhoto}" onerror="this.parentNode.textContent='👤'" alt="">` : '👤'}
+          </div>
+          <div>
+            <div class="reviewer-name">${escHtml(r.author)}</div>
+            <div class="review-rating-stars">
+              ${Array.from({length:5},(_,i)=>`<span class="review-star ${i<r.rating?'':'empty'}">★</span>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="review-date">${r.timeDescription || ''}</div>
+          <div style="margin-top:3px;"><span class="badge badge-google" style="font-size:9px;padding:2px 6px;">Google</span></div>
+        </div>
+      </div>
+      <div class="review-text" id="review-g-${r.time}">
+        ${truncateText(escHtml(r.text || ''), 280)}
+      </div>
+    </div>
+  `).join('') : '';
+
+  const taReviewsHtml = hasTA ? ta.reviews.map(r => `
+    <div class="review-card">
+      <div class="review-header">
+        <div class="reviewer-info">
+          <div class="reviewer-avatar">
+            ${r.user?.avatar ? `<img src="${r.user.avatar}" onerror="this.parentNode.textContent='👤'" alt="">` : '👤'}
+          </div>
+          <div>
+            <div class="reviewer-name">${escHtml(r.user?.username || 'Guest')}</div>
+            ${r.user?.userLocation ? `<div class="reviewer-location">${escHtml(r.user.userLocation)}</div>` : ''}
+            <div class="review-rating-stars">
+              ${Array.from({length:5},(_,i)=>`<span class="review-star ${i<r.rating?'':'empty'}">★</span>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="review-date">${r.publishedDate ? new Date(r.publishedDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</div>
+          ${r.tripType ? `<div class="review-trip-type" style="margin-top:3px;">${r.tripType.replace('_',' ')}</div>` : ''}
+          <div style="margin-top:3px;"><span class="badge badge-ta" style="font-size:9px;padding:2px 6px;">TripAdvisor</span></div>
+        </div>
+      </div>
+      ${r.title ? `<div class="review-title" style="margin-bottom:6px;">${escHtml(r.title)}</div>` : ''}
+      <div class="review-text">
+        ${truncateText(escHtml(r.text || ''), 280)}
+      </div>
+    </div>
+  `).join('') : '';
+
+  // Show both sources side by side with toggle
+  const activeSource = activeReviewSource;
+
+  return `
+    <div class="reviews-header">
+      <span style="font-size:13px;color:var(--text-muted);">
+        ${(g?.reviews?.length || 0) + (ta?.reviews?.length || 0)} reviews loaded
+      </span>
+      <div class="source-toggle">
+        ${hasGoogle ? `<button class="source-btn google ${activeSource==='google'?'active':''}" onclick="setReviewSource('google', ${p.id})">Google (${g.reviews.length})</button>` : ''}
+        ${hasTA ? `<button class="source-btn ta ${activeSource==='ta'?'active':''}" onclick="setReviewSource('ta', ${p.id})">TripAdvisor (${ta.reviews.length})</button>` : ''}
+        ${hasGoogle && hasTA ? `<button class="source-btn ${activeSource==='all'?'active':''}" style="${activeSource==='all'?'background:var(--surface2);color:var(--text-dim);border-color:var(--border-light);':''}" onclick="setReviewSource('all', ${p.id})">All</button>` : ''}
+      </div>
+    </div>
+    <div class="reviews-grid" id="reviews-container">
+      ${activeSource === 'google' ? googleReviewsHtml :
+        activeSource === 'ta' ? taReviewsHtml :
+        googleReviewsHtml + taReviewsHtml}
+    </div>
+  `;
+}
+
+function setReviewSource(source, id) {
+  activeReviewSource = source;
+  renderPropertyOverview(id);
+  // Re-activate reviews tab
+  setTimeout(() => switchTab('reviews'), 10);
+}
+
+function renderPhotos(photos) {
+  if (photos.length === 0) {
+    return `<div class="no-data">
+      <div class="no-data-icon">📷</div>
+      <div class="no-data-text">No photos loaded yet</div>
+      <div class="no-data-hint">Run <code>npm run fetch</code> to pull photo data</div>
+    </div>`;
+  }
+
+  return `
+    <div class="photos-grid">
+      ${photos.map((ph, idx) => {
+        const url = ph.url;
+        if (!url) return '';
+        return `
+          <div class="photo-card" onclick="openLightbox(${idx})">
+            <img src="${url}" alt="${escHtml(ph.caption || '')}" loading="lazy"
+              onerror="this.parentNode.style.display='none'">
+            <span class="photo-source-tag ${ph.source}">${ph.source === 'google' ? 'G' : 'TA'}</span>
+            ${ph.caption ? `<div class="photo-caption">${escHtml(ph.caption)}</div>` : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  document.getElementById(`tab-content-${tab}`).classList.add('active');
+}
+
+// ─────────────────────────────────────────
+//  Portfolio Table
+// ─────────────────────────────────────────
+function renderPortfolioTable() {
+  const wrap = document.getElementById('portfolio-table-wrap');
+  const items = [...portfolio].sort((a,b) => a.id - b.id);
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Property</th>
+          <th>Brand</th>
+          <th>City</th>
+          <th>Google Rating</th>
+          <th>Google Reviews</th>
+          <th>TA Rating</th>
+          <th>TA Reviews</th>
+          <th>TA Ranking</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(p => {
+          const g = p.google;
+          const ta = p.tripadvisor;
+          return `
+            <tr onclick="selectProperty(${p.id})">
+              <td style="color:var(--text-muted);font-size:12px;">${p.id}</td>
+              <td><div class="table-name">${p.name}</div></td>
+              <td class="table-brand">${p.brand}</td>
+              <td class="table-city">${p.city}, ${p.state}</td>
+              <td>
+                ${g && !g.error && g.rating
+                  ? `<span class="rating-pill google">★ ${g.rating}</span>`
+                  : `<span class="rating-pill none">—</span>`}
+              </td>
+              <td style="color:var(--text-muted);">
+                ${g && !g.error && g.totalRatings ? (g.totalRatings).toLocaleString() : '—'}
+              </td>
+              <td>
+                ${ta && !ta.error && ta.rating
+                  ? `<span class="rating-pill ta">★ ${ta.rating}</span>`
+                  : `<span class="rating-pill none">—</span>`}
+              </td>
+              <td style="color:var(--text-muted);">
+                ${ta && !ta.error && ta.numReviews ? (ta.numReviews).toLocaleString() : '—'}
+              </td>
+              <td style="font-size:11px;color:var(--text-muted);">
+                ${ta && !ta.error && ta.rankingString ? ta.rankingString.replace(/^#\d+ of /, '#').slice(0,35) + '...' : '—'}
+              </td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// ─────────────────────────────────────────
+//  Export CSV
+// ─────────────────────────────────────────
+function exportCSV() {
+  const headers = ['ID','Name','Brand','City','State','Google Rating','Google Reviews','TA Rating','TA Reviews','TA Ranking','Google URL','TA URL'];
+  const rows = portfolio.map(p => [
+    p.id,
+    `"${p.name}"`,
+    `"${p.brand}"`,
+    p.city,
+    p.state,
+    p.google?.rating || '',
+    p.google?.totalRatings || '',
+    p.tripadvisor?.rating || '',
+    p.tripadvisor?.numReviews || '',
+    `"${p.tripadvisor?.rankingString || ''}"`,
+    p.google?.googleMapsUrl || '',
+    p.tripadvisor?.tripadvisorUrl || '',
+  ]);
+
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `portfolio-intel-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ─────────────────────────────────────────
+//  Lightbox
+// ─────────────────────────────────────────
+function openLightbox(idx) {
+  lightboxIdx = idx;
+  updateLightboxImg();
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+function lightboxNav(dir) {
+  lightboxIdx = (lightboxIdx + dir + lightboxPhotos.length) % lightboxPhotos.length;
+  updateLightboxImg();
+}
+
+function updateLightboxImg() {
+  const ph = lightboxPhotos[lightboxIdx];
+  document.getElementById('lightbox-img').src = ph?.url || '';
+}
+
+document.getElementById('lightbox').addEventListener('click', function(e) {
+  if (e.target === this) closeLightbox();
+});
+
+document.addEventListener('keydown', e => {
+  if (document.getElementById('lightbox').classList.contains('open')) {
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') lightboxNav(-1);
+    if (e.key === 'ArrowRight') lightboxNav(1);
+  }
+});
+
+// ─────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function truncateText(text, maxLen) {
+  if (!text || text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + `<span class="read-more" onclick="this.parentNode.innerHTML=\`${text.replace(/`/g,'\\`').replace(/\$/g,'\\$')}\`">... read more</span>`;
+}
+
+// ─────────────────────────────────────────
+//  Boot
+// ─────────────────────────────────────────
+init();
+</script>
+
+</body>
+</html>
