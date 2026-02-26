@@ -157,10 +157,10 @@ async function lookupRoomsViaGemini(name, address) {
     console.log('[Gemini] No API key configured — skipping room lookup');
     return null;
   }
-  const prompt = `How many total guest rooms (keys) does the hotel "${name}" at "${address}" have? Reply with ONLY an integer. If you are not confident or the hotel is unknown, reply with null.`;
+  const prompt = `You are a hotel industry database. What is the exact total number of guest rooms (keys) at "${name}" located at "${address}"? Think carefully — recall the specific property, not a similar-named one. Reply with ONLY a single integer (e.g. 316). If you cannot find this specific property with confidence, reply with the single word null.`;
   const res = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0, maxOutputTokens: 64, thinkingConfig: { thinkingBudget: 0 } } },
+    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 1, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 512 } } },
     { headers: { 'Content-Type': 'application/json' } }
   );
   const raw = res.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
@@ -422,7 +422,7 @@ app.get('/api/test-gemini', async (req, res) => {
   try {
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      { contents: [{ parts: [{ text: 'How many rooms does the JW Marriott Houston at 806 Main St, Houston, TX have? Reply with ONLY an integer.' }] }], generationConfig: { temperature: 0, maxOutputTokens: 64, thinkingConfig: { thinkingBudget: 0 } } },
+      { contents: [{ parts: [{ text: 'You are a hotel industry database. What is the exact total number of guest rooms (keys) at "JW Marriott Houston" located at "806 Main St, Houston, TX"? Think carefully — recall the specific property, not a similar-named one. Reply with ONLY a single integer (e.g. 316). If you cannot find this specific property with confidence, reply with the single word null.' }] }], generationConfig: { temperature: 1, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 512 } } },
       { headers: { 'Content-Type': 'application/json' } }
     );
     const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
