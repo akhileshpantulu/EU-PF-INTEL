@@ -13,6 +13,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import open from 'open';
+import { main as runFetch } from './scripts/fetch-all.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -59,9 +60,10 @@ app.get('/api/properties', (req, res) => {
   res.json(JSON.parse(fs.readFileSync(propsPath, 'utf8')));
 });
 
-// API: trigger re-fetch (useful for scheduled updates)
-app.post('/api/refresh', async (req, res) => {
-  res.json({ message: 'Refresh triggered. Run `npm run fetch` in terminal.' });
+// API: trigger re-fetch (runs fetch-all in the background)
+app.post('/api/refresh', (req, res) => {
+  res.status(202).json({ message: 'Refresh started.' });
+  runFetch().catch(err => console.error(chalk.red('Background refresh failed:'), err));
 });
 
 app.listen(PORT, async () => {
@@ -72,11 +74,13 @@ app.listen(PORT, async () => {
   console.log(chalk.green(`  Running at: ${chalk.bold.white(url)}`));
   console.log(chalk.gray('  Press Ctrl+C to stop\n'));
 
-  // Auto-open browser
-  try {
-    await open(url);
-    console.log(chalk.gray('  Browser opened automatically'));
-  } catch {
-    console.log(chalk.gray('  Open your browser and navigate to the URL above'));
+  // Auto-open browser (only in interactive/local terminal sessions)
+  if (process.stdout.isTTY) {
+    try {
+      await open(url);
+      console.log(chalk.gray('  Browser opened automatically'));
+    } catch {
+      console.log(chalk.gray('  Open your browser and navigate to the URL above'));
+    }
   }
 });
