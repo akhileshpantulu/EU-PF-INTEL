@@ -432,6 +432,65 @@ app.get('/api/test-gemini', async (req, res) => {
   }
 });
 
+// POST /api/review-analysis — Gemini-powered sentiment analysis: top 3 best + worst reviews + summary
+app.post('/api/review-analysis', async (req, res) => {
+  const { name, googleReviews = [], taReviews = [] } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here')
+    return res.json({ summary: null, top3best: [], top3worst: [] });
+
+  const gReviews = (googleReviews || []).slice(0, 5)
+    .filter(r => r.text?.trim())
+    .map(r => ({ source: 'Google', rating: r.rating, author: r.author || 'Guest', title: '', text: r.text }));
+  const tReviews = [...(taReviews || [])]
+    .sort((a, b) => (b.helpfulVotes || 0) - (a.helpfulVotes || 0))
+    .slice(0, 20)
+    .filter(r => r.text?.trim())
+    .map(r => ({ source: 'TripAdvisor', rating: r.rating, author: r.user?.username || 'Guest', title: r.title || '', text: r.text }));
+  const combined = [...gReviews, ...tReviews];
+
+  if (combined.length === 0)
+    return res.json({ summary: null, top3best: [], top3worst: [] });
+
+  const reviewsText = combined.map((r, i) =>
+    `[${i + 1}] Source: ${r.source} | Rating: ${r.rating}/5 | Author: ${r.author}${r.title ? ` | Title: "${r.title}"` : ''}\n"${r.text.slice(0, 500)}"`
+  ).join('\n\n');
+
+  const prompt = `You are a hospitality analyst. Analyze these ${combined.length} guest reviews for the hotel "${name}".
+
+${reviewsText}
+
+Return a JSON object with EXACTLY this structure:
+{
+  "summary": "2-3 sentences describing overall guest sentiment, the most praised aspects, and the most common criticisms",
+  "top3best": [
+    { "quote": "verbatim excerpt from a positive review, max 120 chars", "rating": 5, "source": "Google or TripAdvisor", "author": "reviewer name" }
+  ],
+  "top3worst": [
+    { "quote": "verbatim excerpt from a critical review, max 120 chars", "rating": 2, "source": "Google or TripAdvisor", "author": "reviewer name" }
+  ]
+}
+Select the 3 most informative/representative reviews for each category. Quotes must be verbatim from the text above.`;
+
+  try {
+    const gemRes = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 1, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 512 }, responseMimeType: 'application/json' }
+      },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    const raw = gemRes.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '{}';
+    res.json(JSON.parse(raw));
+  } catch (err) {
+    console.error('[Gemini] review-analysis error:', err.response?.data || err.message);
+    res.json({ summary: null, top3best: [], top3worst: [] });
+  }
+});
+
 // API: status — which API keys are configured
 app.get('/api/status', (req, res) => {
   res.json({
