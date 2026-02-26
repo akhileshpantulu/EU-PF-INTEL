@@ -895,6 +895,10 @@
     .ranking-score { font-size: 14px; font-weight: 700; flex-shrink: 0; }
     /* ─── FOLDER MAP ─── */
     #folder-map { height: 380px; border-radius: var(--radius-sm); overflow: hidden; }
+    /* Fullscreen map modal */
+    #map-fullscreen-modal { display: none; position: fixed; inset: 0; z-index: 9999; background: var(--bg); flex-direction: column; }
+    #map-fullscreen-modal.open { display: flex; }
+    #map-fullscreen-map { flex: 1; }
     .folder-map-marker { background: var(--accent); border: 2px solid rgba(255,255,255,0.9); border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
     .leaflet-popup-content-wrapper { background: var(--surface) !important; border: 1px solid var(--border-light) !important; border-radius: var(--radius) !important; color: var(--text) !important; font-family: 'DM Sans', sans-serif !important; box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; }
     .leaflet-popup-tip { background: var(--surface) !important; }
@@ -1026,6 +1030,8 @@ let activeFolderStates = {};
 let selectedFolderHotel = null;
 let selectedFolder = null;
 let currentFolderMap = null;
+let folderMapHotels = [];
+let currentFullscreenMap = null;
 let currentSearchHotel = null;
 let activeSearchReviewSource = 'all';
 
@@ -1376,6 +1382,7 @@ function renderSavedHotelOverview(hotel) {
           <div class="rating-main"><span class="rating-number ta">${ta.rating || '—'}</span><span class="rating-max">/ 5</span></div>
           <div class="stars-row">${starsHtml(ta.rating || 0)}</div>
           <div class="rating-count">${ta.numReviews || 0} reviews</div>
+          ${ta.numRooms ? `<div class="rating-count" style="margin-top:4px;">🏨 ${ta.numRooms} rooms</div>` : ''}
           ${taSubratingHtml ? `<div class="subratings">${taSubratingHtml}</div>` : ''}
           ${ta.rankingString ? `<div class="ranking-badge">${escHtml(ta.rankingString)}</div>` : ''}
         </div>` : ''}
@@ -1469,7 +1476,10 @@ function renderFolderOverview(folder) {
           </div>
         </div>
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
-          <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;">📍 Folder Map</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);">📍 Folder Map</div>
+            ${hasMap ? `<button onclick="openMapFullscreen()" style="padding:3px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:20px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.03em;">⤢ Expand</button>` : ''}
+          </div>
           ${hasMap
             ? `<div id="folder-map"></div>`
             : `<div style="padding:32px;text-align:center;color:var(--text-muted);font-size:13px;">No location data yet — use ↻ Refresh on each hotel to add it to the map.</div>`}
@@ -1480,6 +1490,7 @@ function renderFolderOverview(folder) {
 }
 
 function initFolderMap(hotels) {
+  folderMapHotels = hotels;
   if (currentFolderMap) { currentFolderMap.remove(); currentFolderMap = null; }
   const mapEl = document.getElementById('folder-map');
   if (!mapEl) return;
@@ -1728,6 +1739,7 @@ function renderSearchOverview(hotel, taData, taError) {
           </div>
           <div class="stars-row">${starsHtml(taData.rating || 0)}</div>
           <div class="rating-count">${taData.numReviews || 0} reviews</div>
+          ${taData.numRooms ? `<div class="rating-count" style="margin-top:4px;">🏨 ${taData.numRooms} rooms</div>` : ''}
           ${taSubratingHtml ? `<div class="subratings">${taSubratingHtml}</div>` : ''}
           ${taData.rankingString ? `<div class="ranking-badge">${escHtml(taData.rankingString)}</div>` : ''}
         </div>` : taError ? `
@@ -2275,6 +2287,54 @@ function truncateText(text, maxLen) {
 //  Boot
 // ─────────────────────────────────────────
 init();
+</script>
+
+<!-- Fullscreen Map Modal -->
+<div id="map-fullscreen-modal">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface);">
+    <span style="font-size:13px;font-weight:600;letter-spacing:0.04em;color:var(--text);">📍 Folder Map</span>
+    <button onclick="closeMapFullscreen()" style="padding:5px 14px;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:20px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">✕ Close</button>
+  </div>
+  <div id="map-fullscreen-map"></div>
+</div>
+
+<script>
+// ─── Fullscreen Map ───────────────────────────────────────────────────────────
+function openMapFullscreen() {
+  const modal = document.getElementById('map-fullscreen-modal');
+  modal.classList.add('open');
+  if (currentFullscreenMap) { currentFullscreenMap.remove(); currentFullscreenMap = null; }
+  const mapEl = document.getElementById('map-fullscreen-map');
+  if (!mapEl) return;
+  const withCoords = folderMapHotels.filter(h => h.lat && h.lng);
+  if (!withCoords.length) return;
+
+  currentFullscreenMap = L.map('map-fullscreen-map');
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd', maxZoom: 19,
+  }).addTo(currentFullscreenMap);
+
+  const icon = L.divIcon({ className: 'folder-map-marker', iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -10] });
+  withCoords.forEach(h => {
+    const popup = `
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">${escHtml(h.name)}</div>
+      <div style="font-size:11px;color:#8891a8;margin-bottom:6px;">${escHtml(h.address || '')}</div>
+      ${h.rating ? `<div style="color:#4ade80;font-weight:600;">★ ${h.rating} · ${(h.totalRatings || 0).toLocaleString()} reviews</div>` : ''}`;
+    L.marker([h.lat, h.lng], { icon }).bindPopup(popup, { maxWidth: 300 }).addTo(currentFullscreenMap);
+  });
+  const group = L.featureGroup(withCoords.map(h => L.marker([h.lat, h.lng])));
+  currentFullscreenMap.fitBounds(group.getBounds().pad(0.2));
+}
+
+function closeMapFullscreen() {
+  document.getElementById('map-fullscreen-modal').classList.remove('open');
+  if (currentFullscreenMap) { currentFullscreenMap.remove(); currentFullscreenMap = null; }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeMapFullscreen();
+});
 </script>
 
 </body>

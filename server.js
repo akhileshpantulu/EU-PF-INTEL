@@ -124,6 +124,7 @@ async function fetchTAHotelDetails(locationId) {
       address: d.address_obj?.address_string,
       rating: parseFloat(d.rating) || null,
       numReviews: d.num_reviews,
+      numRooms: d.num_rooms || null,
       rankingString: d.ranking_data?.ranking_string,
       priceLevel: d.price_level,
       subratings,

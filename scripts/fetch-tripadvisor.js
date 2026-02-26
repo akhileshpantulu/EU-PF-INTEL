@@ -208,6 +208,7 @@ async function fetchProperty(property) {
       rankingCategory: details.ranking_data?.ranking_category,
       priceLevel: details.price_level,
       priceRange: details.price,
+      numRooms: details.num_rooms || null,
       subratings,
       awardedBadges: details.awards?.map(a => a.display_name) || [],
       reviews: parsedReviews,
