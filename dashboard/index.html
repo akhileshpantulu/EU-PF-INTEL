@@ -1034,6 +1034,8 @@ let folderMapHotels = [];
 let currentFullscreenMap = null;
 let currentSearchHotel = null;
 let activeSearchReviewSource = 'all';
+let _reviewCtx = null;
+const _reviewCache = new Map();
 
 // ─────────────────────────────────────────
 //  Init
@@ -1327,7 +1329,16 @@ async function selectSavedHotel(folderId, placeId) {
     if (hotel.error) throw new Error(hotel.error);
     renderSavedHotelOverview(hotel);
     if (!hotel.numRooms) fetchAndDisplayRooms(hotel.name, hotel.address);
-    fetchAndDisplaySentiment(hotel.name, hotel.cachedData?.reviews || [], hotel.cachedData?.tripadvisor?.reviews || []);
+    const _savedCached = hotel.cachedData?.reviewAnalysis || _reviewCache.get(hotel.placeId) || null;
+    _reviewCtx = {
+      name: hotel.name,
+      googleReviews: hotel.cachedData?.reviews || [],
+      taReviews: hotel.cachedData?.tripadvisor?.reviews || [],
+      folderId: hotel.folderId,
+      placeId: hotel.placeId
+    };
+    if (_savedCached) renderReviewAnalysis(_savedCached);
+    else showReviewAnalysisButton();
   } catch (err) {
     document.getElementById('overview-content').innerHTML = `<div style="padding:32px;color:var(--red);">Failed to load: ${escHtml(err.message)}</div>`;
   }
@@ -1394,9 +1405,7 @@ function renderSavedHotelOverview(hotel) {
         </div>` : ''}
       </div>
     </div>
-    <div id="review-analysis" style="margin-bottom:16px;">
-      <div style="font-size:12px;font-style:italic;color:var(--text-muted);padding:6px 0;">✨ Analyzing reviews…</div>
-    </div>
+    <div id="review-analysis" style="margin-bottom:16px;"></div>
     <div class="tabs" style="margin-bottom:20px;">
       <div class="tab active" id="tab-reviews" onclick="switchTab('reviews')">Reviews</div>
       <div class="tab" id="tab-photos" onclick="switchTab('photos')">Photos ${allPhotos.length > 0 ? `<span style="opacity:0.6;font-size:11px;">(${allPhotos.length})</span>` : ''}</div>
@@ -1700,7 +1709,15 @@ async function selectSearchResult(placeId, el, name) {
     }
     renderSearchOverview(hotel, taData, taError);
     fetchAndDisplayRooms(hotel.name, hotel.address);
-    fetchAndDisplaySentiment(hotel.name, hotel.reviews || [], taData?.reviews || []);
+    const _searchCached = _reviewCache.get(hotel.place_id) || null;
+    _reviewCtx = {
+      name: hotel.name,
+      googleReviews: hotel.reviews || [],
+      taReviews: taData?.reviews || [],
+      placeId: hotel.place_id
+    };
+    if (_searchCached) renderReviewAnalysis(_searchCached);
+    else showReviewAnalysisButton();
   } catch (err) {
     document.getElementById('overview-content').innerHTML =
       `<div style="padding:32px;color:var(--red);">Failed to load: ${escHtml(err.message)}</div>`;
@@ -1774,9 +1791,7 @@ function renderSearchOverview(hotel, taData, taError) {
         </div>` : ''}
       </div>
     </div>
-    <div id="review-analysis" style="margin-bottom:16px;">
-      <div style="font-size:12px;font-style:italic;color:var(--text-muted);padding:6px 0;">✨ Analyzing reviews…</div>
-    </div>
+    <div id="review-analysis" style="margin-bottom:16px;"></div>
     <div class="tabs" style="margin-bottom:20px;">
       <div class="tab active" id="tab-reviews" onclick="switchTab('reviews')">Reviews</div>
       <div class="tab" id="tab-photos" onclick="switchTab('photos')">
@@ -2321,46 +2336,69 @@ async function fetchAndDisplayRooms(name, address) {
 }
 
 // ─────────────────────────────────────────
-//  Gemini Review Sentiment Analysis
+//  Claude Review Sentiment Analysis
 // ─────────────────────────────────────────
-async function fetchAndDisplaySentiment(name, googleReviews, taReviews) {
+function showReviewAnalysisButton() {
   const el = document.getElementById('review-analysis');
   if (!el) return;
-  if (!googleReviews?.length && !taReviews?.length) { el.remove(); return; }
+  if (!_reviewCtx?.googleReviews?.length && !_reviewCtx?.taReviews?.length) { el.remove(); return; }
+  el.innerHTML = `<button onclick="triggerReviewAnalysis()"
+    style="background:var(--surface);border:1px solid var(--border);border-radius:8px;
+           padding:9px 16px;font-size:12px;color:var(--text-muted);cursor:pointer;
+           width:100%;text-align:left;transition:border-color 0.15s;">
+    ✨ Analyze Reviews with AI
+  </button>`;
+}
+
+async function triggerReviewAnalysis() {
+  if (!_reviewCtx) return;
+  const el = document.getElementById('review-analysis');
+  if (el) el.innerHTML = `<div style="font-size:12px;font-style:italic;color:var(--text-muted);padding:6px 0;">✨ Analyzing reviews…</div>`;
   try {
+    const body = {
+      name: _reviewCtx.name,
+      googleReviews: _reviewCtx.googleReviews,
+      taReviews: _reviewCtx.taReviews,
+      ...(_reviewCtx.folderId && _reviewCtx.placeId ? { folderId: _reviewCtx.folderId, placeId: _reviewCtx.placeId } : {})
+    };
     const r = await fetch('/api/review-analysis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, googleReviews: googleReviews || [], taReviews: taReviews || [] })
+      body: JSON.stringify(body)
     });
-    if (!r.ok) { el.remove(); return; }
-    const { summary, top3best = [], top3worst = [] } = await r.json();
-    if (!summary) { el.remove(); return; }
-
-    const quoteCard = (q, positive) =>
-      `<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid ${positive ? 'var(--green)' : 'var(--red)'};border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-        <div style="font-size:12px;line-height:1.6;color:var(--text);">"${escHtml(q.quote)}"</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">${starsHtml(q.rating)}&nbsp;${escHtml(q.author)} · <span style="opacity:0.7;">${escHtml(q.source)}</span></div>
-      </div>`;
-
-    el.innerHTML =
-      `<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:4px;">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">✨ AI Review Analysis</div>
-        <p style="font-size:13px;line-height:1.65;color:var(--text);margin:0 0 16px;">${escHtml(summary)}</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-          <div>
-            <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">🌟 Top Highlights</div>
-            ${top3best.map(q => quoteCard(q, true)).join('')}
-          </div>
-          <div>
-            <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">⚠️ Top Concerns</div>
-            ${top3worst.map(q => quoteCard(q, false)).join('')}
-          </div>
-        </div>
-      </div>`;
+    if (!r.ok) { if (el) el.remove(); return; }
+    const result = await r.json();
+    if (!result.summary) { if (el) el.remove(); return; }
+    if (_reviewCtx.placeId) _reviewCache.set(_reviewCtx.placeId, result);
+    renderReviewAnalysis(result);
   } catch {
-    el.remove();
+    if (el) el.remove();
   }
+}
+
+function renderReviewAnalysis({ summary, top3best = [], top3worst = [] }) {
+  const el = document.getElementById('review-analysis');
+  if (!el) return;
+  const quoteCard = (q, positive) =>
+    `<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid ${positive ? 'var(--green)' : 'var(--red)'};border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+      <div style="font-size:12px;line-height:1.6;color:var(--text);">"${escHtml(q.quote)}"</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">${starsHtml(q.rating)}&nbsp;${escHtml(q.author)} · <span style="opacity:0.7;">${escHtml(q.source)}</span></div>
+    </div>`;
+  el.innerHTML =
+    `<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:4px;">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">✨ AI Review Analysis</div>
+      <p style="font-size:13px;line-height:1.65;color:var(--text);margin:0 0 16px;">${escHtml(summary)}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">🌟 Top Highlights</div>
+          ${top3best.map(q => quoteCard(q, true)).join('')}
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">⚠️ Top Concerns</div>
+          ${top3worst.map(q => quoteCard(q, false)).join('')}
+        </div>
+      </div>
+    </div>`;
 }
 
 // ─────────────────────────────────────────
