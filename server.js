@@ -28,8 +28,79 @@ if (fs.existsSync(envPath)) {
   });
 }
 
+// ─── Saved Portfolios helpers ────────────────────────────────────────────────
+const PORTFOLIOS_PATH = path.join(__dirname, 'saved-portfolios.json');
+
+function loadPortfolios() {
+  if (!fs.existsSync(PORTFOLIOS_PATH)) return { folders: [] };
+  try { return JSON.parse(fs.readFileSync(PORTFOLIOS_PATH, 'utf8')); }
+  catch { return { folders: [] }; }
+}
+
+function savePortfolios(data) {
+  fs.writeFileSync(PORTFOLIOS_PATH, JSON.stringify(data, null, 2), 'utf8');
+  syncToGitHub(data).catch(err => console.error(chalk.yellow('  GitHub sync failed:'), err.message));
+}
+
+async function syncToGitHub(data) {
+  const token = process.env.GITHUB_TOKEN;
+  const repo = process.env.GITHUB_REPO;
+  const branch = process.env.GITHUB_BRANCH || 'main';
+  if (!token || !repo) return;
+  const content = Buffer.from(JSON.stringify(data, null, 2)).toString('base64');
+  const apiUrl = `https://api.github.com/repos/${repo}/contents/saved-portfolios.json`;
+  const headers = { Authorization: `token ${token}`, 'User-Agent': 'portfolio-intel' };
+  let sha;
+  try {
+    const existing = await axios.get(apiUrl, { headers, params: { ref: branch } });
+    sha = existing.data.sha;
+  } catch (e) {
+    if (e.response?.status !== 404) throw e;
+  }
+  await axios.put(apiUrl,
+    { message: 'chore: update saved-portfolios.json', content, branch, ...(sha ? { sha } : {}) },
+    { headers: { ...headers, 'Content-Type': 'application/json' } }
+  );
+  console.log(chalk.green('  GitHub sync: saved-portfolios.json committed'));
+}
+
+async function fetchHotelDetails(placeId) {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) throw new Error('Google API key not configured');
+  const r = await axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
+    params: {
+      place_id: placeId,
+      fields: 'name,rating,user_ratings_total,reviews,photos,website,formatted_phone_number,url,formatted_address',
+      key: apiKey
+    }
+  });
+  const d = r.data.result;
+  return {
+    placeId,
+    name: d.name,
+    address: d.formatted_address,
+    rating: d.rating,
+    totalRatings: d.user_ratings_total,
+    googleMapsUrl: d.url,
+    website: d.website,
+    phone: d.formatted_phone_number,
+    reviews: (d.reviews || []).map(rv => ({
+      author: rv.author_name, rating: rv.rating, text: rv.text,
+      time: rv.time, timeDescription: rv.relative_time_description,
+      profilePhoto: rv.profile_photo_url
+    })),
+    photos: (d.photos || []).slice(0, 20).map(p => ({
+      url: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${p.photo_reference}&key=${apiKey}`,
+      width: p.width, height: p.height
+    }))
+  };
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const PORT = parseInt(process.env.PORT || '3737');
 const app = express();
+
+app.use(express.json());
 
 // Serve static dashboard
 app.use(express.static(path.join(__dirname, 'dashboard')));
@@ -84,33 +155,11 @@ app.get('/api/search', async (req, res) => {
 app.get('/api/hotel', async (req, res) => {
   const { placeId } = req.query;
   if (!placeId) return res.status(400).json({ error: 'placeId required' });
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'Google API key not configured' });
   try {
-    const r = await axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
-      params: {
-        place_id: placeId,
-        fields: 'name,rating,user_ratings_total,reviews,photos,website,formatted_phone_number,url,formatted_address',
-        key: apiKey
-      }
-    });
-    const d = r.data.result;
-    res.json({
-      placeId, name: d.name, address: d.formatted_address,
-      rating: d.rating, totalRatings: d.user_ratings_total,
-      googleMapsUrl: d.url, website: d.website, phone: d.formatted_phone_number,
-      reviews: (d.reviews || []).map(rv => ({
-        author: rv.author_name, rating: rv.rating, text: rv.text,
-        time: rv.time, timeDescription: rv.relative_time_description,
-        profilePhoto: rv.profile_photo_url
-      })),
-      photos: (d.photos || []).slice(0, 20).map(p => ({
-        url: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${p.photo_reference}&key=${apiKey}`,
-        width: p.width, height: p.height
-      }))
-    });
+    res.json(await fetchHotelDetails(placeId));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = err.message.includes('not configured') ? 503 : 500;
+    res.status(status).json({ error: err.message });
   }
 });
 
@@ -119,6 +168,115 @@ app.post('/api/refresh', (req, res) => {
   res.status(202).json({ message: 'Refresh started.' });
   runFetch().catch(err => console.error(chalk.red('Background refresh failed:'), err));
 });
+
+// ─── Saved Folders API ───────────────────────────────────────────────────────
+
+// GET /api/folders — all folders, slim (no cachedData)
+app.get('/api/folders', (req, res) => {
+  const data = loadPortfolios();
+  const slim = data.folders.map(f => ({
+    id: f.id, name: f.name, createdAt: f.createdAt,
+    hotels: f.hotels.map(h => ({
+      placeId: h.placeId, name: h.name, address: h.address,
+      rating: h.rating, totalRatings: h.totalRatings,
+      savedAt: h.savedAt, lastFetched: h.lastFetched
+    }))
+  }));
+  res.json(slim);
+});
+
+// POST /api/folders — create a folder
+app.post('/api/folders', (req, res) => {
+  const { name } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+  const data = loadPortfolios();
+  const folder = { id: `f_${Date.now()}`, name: name.trim(), createdAt: new Date().toISOString(), hotels: [] };
+  data.folders.push(folder);
+  savePortfolios(data);
+  res.status(201).json(folder);
+});
+
+// DELETE /api/folders/:id — delete a folder
+app.delete('/api/folders/:id', (req, res) => {
+  const data = loadPortfolios();
+  const before = data.folders.length;
+  data.folders = data.folders.filter(f => f.id !== req.params.id);
+  if (data.folders.length === before) return res.status(404).json({ error: 'Folder not found' });
+  savePortfolios(data);
+  res.json({ ok: true });
+});
+
+// POST /api/folders/:id/hotels — save a hotel (fetches + caches immediately)
+app.post('/api/folders/:id/hotels', async (req, res) => {
+  const { placeId, name, address, rating, totalRatings } = req.body;
+  if (!placeId) return res.status(400).json({ error: 'placeId required' });
+  const data = loadPortfolios();
+  const folder = data.folders.find(f => f.id === req.params.id);
+  if (!folder) return res.status(404).json({ error: 'Folder not found' });
+  if (folder.hotels.find(h => h.placeId === placeId)) {
+    return res.status(409).json({ error: 'Hotel already in folder' });
+  }
+  try {
+    const full = await fetchHotelDetails(placeId);
+    const now = new Date().toISOString();
+    const hotel = {
+      placeId, name: full.name || name, address: full.address || address,
+      rating: full.rating ?? rating, totalRatings: full.totalRatings ?? totalRatings,
+      savedAt: now, lastFetched: now,
+      cachedData: { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos }
+    };
+    folder.hotels.push(hotel);
+    savePortfolios(data);
+    const { cachedData, ...slim } = hotel;
+    res.status(201).json(slim);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/folders/:folderId/hotels/:placeId — remove hotel from folder
+app.delete('/api/folders/:folderId/hotels/:placeId', (req, res) => {
+  const data = loadPortfolios();
+  const folder = data.folders.find(f => f.id === req.params.folderId);
+  if (!folder) return res.status(404).json({ error: 'Folder not found' });
+  const before = folder.hotels.length;
+  folder.hotels = folder.hotels.filter(h => h.placeId !== req.params.placeId);
+  if (folder.hotels.length === before) return res.status(404).json({ error: 'Hotel not found' });
+  savePortfolios(data);
+  res.json({ ok: true });
+});
+
+// POST /api/folders/:folderId/hotels/:placeId/refresh — re-fetch cached data
+app.post('/api/folders/:folderId/hotels/:placeId/refresh', async (req, res) => {
+  const data = loadPortfolios();
+  const folder = data.folders.find(f => f.id === req.params.folderId);
+  if (!folder) return res.status(404).json({ error: 'Folder not found' });
+  const hotel = folder.hotels.find(h => h.placeId === req.params.placeId);
+  if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
+  try {
+    const full = await fetchHotelDetails(req.params.placeId);
+    hotel.rating = full.rating;
+    hotel.totalRatings = full.totalRatings;
+    hotel.lastFetched = new Date().toISOString();
+    hotel.cachedData = { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos };
+    savePortfolios(data);
+    res.json({ ok: true, lastFetched: hotel.lastFetched });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/folders/:folderId/hotels/:placeId — full cached data
+app.get('/api/folders/:folderId/hotels/:placeId', (req, res) => {
+  const data = loadPortfolios();
+  const folder = data.folders.find(f => f.id === req.params.folderId);
+  if (!folder) return res.status(404).json({ error: 'Folder not found' });
+  const hotel = folder.hotels.find(h => h.placeId === req.params.placeId);
+  if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
+  res.json({ ...hotel, folderId: folder.id, folderName: folder.name });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, async () => {
   const url = `http://localhost:${PORT}`;

@@ -823,6 +823,59 @@
     /* ─── VIEWS ─── */
     #view-overview { display: none; }
     #view-portfolio { display: none; }
+
+    /* ─── SAVED FOLDERS ─── */
+    .folders-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+    .folders-section-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; }
+    .folders-section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+    .folder-add-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px; border-radius: 4px; transition: color 0.15s; }
+    .folder-add-btn:hover { color: var(--accent); }
+    .new-folder-input-row { display: none; padding: 6px 16px; gap: 6px; align-items: center; }
+    .new-folder-input-row.visible { display: flex; }
+    .new-folder-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: var(--radius-sm); font-family: inherit; font-size: 12px; outline: none; }
+    .new-folder-input:focus { border-color: var(--accent); }
+    .new-folder-confirm { background: var(--accent-dim); border: 1px solid rgba(200,169,110,0.3); color: var(--accent); padding: 6px 10px; border-radius: var(--radius-sm); font-family: inherit; font-size: 12px; cursor: pointer; }
+    .folder-group { margin-bottom: 4px; }
+    .folder-header { display: flex; align-items: center; justify-content: space-between; padding: 7px 16px; cursor: pointer; border-radius: var(--radius-sm); margin: 0 8px; transition: background 0.15s; }
+    .folder-header:hover { background: var(--surface2); }
+    .folder-header-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .folder-chevron { font-size: 9px; color: var(--text-muted); transition: transform 0.2s; flex-shrink: 0; }
+    .folder-chevron.open { transform: rotate(90deg); }
+    .folder-name { font-size: 12px; font-weight: 600; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .folder-count { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+    .folder-delete-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 4px; opacity: 0; transition: opacity 0.15s, color 0.15s; }
+    .folder-header:hover .folder-delete-btn { opacity: 1; }
+    .folder-delete-btn:hover { color: var(--red); }
+    .folder-hotel-list { display: none; padding: 0 8px 4px 8px; }
+    .folder-hotel-list.open { display: block; }
+    .folder-hotel-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; border: 1px solid transparent; transition: background 0.15s; gap: 6px; }
+    .folder-hotel-item:hover { background: var(--surface2); }
+    .folder-hotel-item.active { background: var(--accent-dim); border-color: rgba(200,169,110,0.25); }
+    .folder-hotel-info { min-width: 0; flex: 1; }
+    .folder-hotel-name { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .folder-hotel-item.active .folder-hotel-name { color: var(--accent); }
+    .folder-hotel-city { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .folder-hotel-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 4px; opacity: 0; flex-shrink: 0; transition: opacity 0.15s, color 0.15s; }
+    .folder-hotel-item:hover .folder-hotel-remove { opacity: 1; }
+    .folder-hotel-remove:hover { color: var(--red); }
+
+    /* ─── SAVE DROPDOWN ─── */
+    .save-dropdown-wrap { position: relative; display: inline-block; }
+    .save-btn { padding: 7px 14px; background: var(--accent-dim); border: 1px solid rgba(200,169,110,0.3); color: var(--accent); border-radius: var(--radius-sm); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .save-btn:hover { background: rgba(200,169,110,0.22); }
+    .save-dropdown { display: none; position: absolute; top: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--radius-sm); min-width: 190px; z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,0.4); overflow: hidden; }
+    .save-dropdown.open { display: block; }
+    .save-dropdown-item { padding: 10px 14px; font-size: 12px; color: var(--text-dim); cursor: pointer; transition: background 0.12s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .save-dropdown-item:hover { background: var(--surface2); }
+    .save-dropdown-item.new-folder { color: var(--accent); border-top: 1px solid var(--border); }
+    .save-dropdown-item.already-saved { color: var(--text-muted); cursor: default; font-style: italic; }
+    .save-dropdown-item.already-saved:hover { background: none; }
+
+    /* ─── SAVED HOTEL DETAIL ─── */
+    .cached-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; background: var(--accent-dim); border: 1px solid rgba(200,169,110,0.25); border-radius: 20px; font-size: 11px; color: var(--accent); font-weight: 600; }
+    .refresh-btn { padding: 7px 12px; background: var(--surface2); border: 1px solid var(--border-light); color: var(--text-dim); border-radius: var(--radius-sm); font-family: inherit; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: border-color 0.15s, color 0.15s; }
+    .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .refresh-btn.spinning { opacity: 0.6; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -874,6 +927,19 @@
     <div class="sidebar-section" id="list-label" style="margin-top:8px;">Portfolio</div>
     <div class="property-list" id="property-list">
       <div class="loading"><div class="spinner"></div></div>
+    </div>
+
+    <!-- Named Folders -->
+    <div class="folders-section" id="folders-section">
+      <div class="folders-section-header">
+        <span class="folders-section-label">Saved Folders</span>
+        <button class="folder-add-btn" onclick="showNewFolderInput()" title="New folder">＋</button>
+      </div>
+      <div class="new-folder-input-row" id="new-folder-row">
+        <input class="new-folder-input" id="new-folder-name" placeholder="Folder name…" maxlength="40">
+        <button class="new-folder-confirm" onclick="createFolder()">Add</button>
+      </div>
+      <div id="folders-list"></div>
     </div>
   </div>
 
@@ -934,6 +1000,10 @@ let selectedId = null;
 let activeReviewSource = 'google';
 let lightboxPhotos = [];
 let lightboxIdx = 0;
+let folders = [];
+let activeFolderStates = {};
+let selectedFolderHotel = null;
+let currentSearchHotel = null;
 
 // ─────────────────────────────────────────
 //  Init
@@ -967,18 +1037,297 @@ async function init() {
     if (!Array.isArray(data) || data.length === 0) {
       portfolio = [];
       renderSidebar();
+      loadFolders();
       showWelcome();
       return;
     }
 
     portfolio = data;
     renderSidebar();
+    loadFolders();
     showWelcome();
 
   } catch (err) {
     console.error('Failed to load data:', err);
+    loadFolders();
     showWelcome();
   }
+}
+
+// ─────────────────────────────────────────
+//  Folders — Load & Render
+// ─────────────────────────────────────────
+async function loadFolders() {
+  try {
+    folders = await fetch('/api/folders').then(r => r.json());
+    renderFolders();
+  } catch (err) {
+    console.error('Failed to load folders:', err);
+  }
+}
+
+function renderFolders() {
+  const container = document.getElementById('folders-list');
+  if (!container) return;
+  if (!folders.length) {
+    container.innerHTML = '<div style="padding:8px 16px;font-size:11px;color:var(--text-muted);">No folders yet — click ＋ to create one</div>';
+    return;
+  }
+  container.innerHTML = folders.map(f => {
+    const isOpen = activeFolderStates[f.id] !== false;
+    return `
+      <div class="folder-group" id="folder-group-${escHtml(f.id)}">
+        <div class="folder-header" onclick="toggleFolder('${escHtml(f.id)}')">
+          <div class="folder-header-left">
+            <span class="folder-chevron ${isOpen ? 'open' : ''}">▶</span>
+            <span class="folder-name" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
+            <span class="folder-count">(${f.hotels.length})</span>
+          </div>
+          <button class="folder-delete-btn"
+            onclick="event.stopPropagation(); deleteFolder('${escHtml(f.id)}', '${escHtml(f.name.replace(/'/g, "\\'"))}')"
+            title="Delete folder">✕</button>
+        </div>
+        <div class="folder-hotel-list ${isOpen ? 'open' : ''}" id="folder-hotels-${escHtml(f.id)}">
+          ${f.hotels.length === 0
+            ? '<div style="padding:6px 10px;font-size:11px;color:var(--text-muted);">Empty folder</div>'
+            : f.hotels.map(h => {
+                const city = h.address?.split(',').slice(-3, -1).join(',').trim() || '';
+                const isActive = selectedFolderHotel?.folderId === f.id && selectedFolderHotel?.placeId === h.placeId;
+                return `
+                  <div class="folder-hotel-item ${isActive ? 'active' : ''}"
+                    onclick="selectSavedHotel('${escHtml(f.id)}', '${escHtml(h.placeId)}')">
+                    <div class="folder-hotel-info">
+                      <div class="folder-hotel-name" title="${escHtml(h.name)}">${escHtml(h.name)}</div>
+                      <div class="folder-hotel-city">${escHtml(city)}</div>
+                    </div>
+                    ${h.rating ? `<span class="mini-rating google" style="flex-shrink:0;"><span class="star">★</span><span class="val">${h.rating}</span></span>` : ''}
+                    <button class="folder-hotel-remove"
+                      onclick="event.stopPropagation(); removeFromFolder('${escHtml(f.id)}', '${escHtml(h.placeId)}', '${escHtml(h.name.replace(/'/g, "\\'"))}')"
+                      title="Remove">✕</button>
+                  </div>`;
+              }).join('')
+          }
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleFolder(folderId) {
+  activeFolderStates[folderId] = activeFolderStates[folderId] === false ? true : false;
+  renderFolders();
+}
+
+// ─────────────────────────────────────────
+//  Folders — Create / Delete
+// ─────────────────────────────────────────
+function showNewFolderInput() {
+  const row = document.getElementById('new-folder-row');
+  row.classList.add('visible');
+  const inp = document.getElementById('new-folder-name');
+  inp.value = '';
+  inp.focus();
+}
+
+document.getElementById('new-folder-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') createFolder();
+  if (e.key === 'Escape') document.getElementById('new-folder-row').classList.remove('visible');
+});
+
+async function createFolder() {
+  const name = document.getElementById('new-folder-name').value.trim();
+  if (!name) return;
+  try {
+    const folder = await fetch('/api/folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    }).then(r => r.json());
+    if (folder.error) { alert(folder.error); return; }
+    folders.push({ ...folder, hotels: [] });
+    activeFolderStates[folder.id] = true;
+    document.getElementById('new-folder-row').classList.remove('visible');
+    renderFolders();
+  } catch (err) {
+    alert('Failed to create folder: ' + err.message);
+  }
+}
+
+async function deleteFolder(folderId, folderName) {
+  if (!confirm(`Delete folder "${folderName}" and all its saved hotels?`)) return;
+  try {
+    const r = await fetch(`/api/folders/${encodeURIComponent(folderId)}`, { method: 'DELETE' }).then(r => r.json());
+    if (r.error) { alert(r.error); return; }
+    folders = folders.filter(f => f.id !== folderId);
+    if (selectedFolderHotel?.folderId === folderId) { selectedFolderHotel = null; showWelcome(); }
+    renderFolders();
+  } catch (err) {
+    alert('Failed to delete folder: ' + err.message);
+  }
+}
+
+// ─────────────────────────────────────────
+//  Save Dropdown
+// ─────────────────────────────────────────
+function openSaveDropdown(hotel) {
+  currentSearchHotel = hotel;
+  const dropdown = document.getElementById('save-dropdown');
+  if (!dropdown) return;
+  const items = folders.map(f => {
+    const alreadySaved = f.hotels.some(h => h.placeId === hotel.placeId);
+    if (alreadySaved) return `<div class="save-dropdown-item already-saved">✓ ${escHtml(f.name)}</div>`;
+    return `<div class="save-dropdown-item" onclick="saveToFolder('${escHtml(f.id)}', '${escHtml(f.name.replace(/'/g, "\\'"))}')">${escHtml(f.name)}</div>`;
+  }).join('');
+  dropdown.innerHTML = items + `<div class="save-dropdown-item new-folder" onclick="saveDropdownNewFolder()">＋ New folder…</div>`;
+  dropdown.classList.add('open');
+  setTimeout(() => document.addEventListener('click', closeSaveDropdown, { once: true }), 0);
+}
+
+function closeSaveDropdown() {
+  const dropdown = document.getElementById('save-dropdown');
+  if (dropdown) dropdown.classList.remove('open');
+}
+
+async function saveToFolder(folderId, folderName) {
+  closeSaveDropdown();
+  if (!currentSearchHotel) return;
+  const h = currentSearchHotel;
+  const btn = document.getElementById('save-btn');
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+  try {
+    const result = await fetch(`/api/folders/${encodeURIComponent(folderId)}/hotels`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ placeId: h.placeId, name: h.name, address: h.address, rating: h.rating, totalRatings: h.totalRatings })
+    }).then(r => r.json());
+    if (result.error === 'Hotel already in folder') {
+      if (btn) { btn.textContent = 'Save ▾'; btn.disabled = false; }
+      alert(`Already saved in "${folderName}"`);
+      return;
+    }
+    if (result.error) throw new Error(result.error);
+    const folder = folders.find(f => f.id === folderId);
+    if (folder) folder.hotels.push(result);
+    renderFolders();
+    if (btn) {
+      btn.textContent = 'Saved ✓';
+      btn.style.background = 'rgba(74,222,128,0.15)';
+      btn.style.color = 'var(--google-green)';
+      btn.style.borderColor = 'rgba(74,222,128,0.3)';
+      setTimeout(() => {
+        btn.textContent = 'Save ▾'; btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; btn.disabled = false;
+      }, 1800);
+    }
+  } catch (err) {
+    if (btn) { btn.textContent = 'Save ▾'; btn.disabled = false; }
+    alert('Failed to save: ' + err.message);
+  }
+}
+
+function saveDropdownNewFolder() {
+  closeSaveDropdown();
+  document.getElementById('folders-section').scrollIntoView({ behavior: 'smooth' });
+  showNewFolderInput();
+}
+
+// ─────────────────────────────────────────
+//  Saved Hotel — View & Remove
+// ─────────────────────────────────────────
+async function selectSavedHotel(folderId, placeId) {
+  selectedFolderHotel = { folderId, placeId };
+  selectedId = null;
+  renderFolders();
+  document.getElementById('view-welcome').style.display = 'none';
+  document.getElementById('view-portfolio').style.display = 'none';
+  document.getElementById('view-overview').style.display = 'block';
+  document.getElementById('overview-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const hotel = await fetch(`/api/folders/${encodeURIComponent(folderId)}/hotels/${encodeURIComponent(placeId)}`).then(r => r.json());
+    if (hotel.error) throw new Error(hotel.error);
+    renderSavedHotelOverview(hotel);
+  } catch (err) {
+    document.getElementById('overview-content').innerHTML = `<div style="padding:32px;color:var(--red);">Failed to load: ${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderSavedHotelOverview(hotel) {
+  const cached = hotel.cachedData || {};
+  const photos = cached.photos || [];
+  lightboxPhotos = photos;
+  const lastFetchedStr = hotel.lastFetched ? timeAgo(new Date(hotel.lastFetched)) : 'never';
+  document.getElementById('overview-content').innerHTML = `
+    <div class="property-header" style="margin-bottom:20px;">
+      <div class="property-title-row">
+        <div>
+          <div style="margin-bottom:8px;"><span class="cached-badge">📁 ${escHtml(hotel.folderName)}</span></div>
+          <div class="property-title">${escHtml(hotel.name)}</div>
+          <div class="property-location"><span>📍</span><span>${escHtml(hotel.address || '')}</span></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-start;">
+          <button class="refresh-btn" id="saved-refresh-btn"
+            onclick="refreshSavedHotel('${escHtml(hotel.folderId)}', '${escHtml(hotel.placeId)}')">
+            ↻ Refresh
+          </button>
+          ${cached.googleMapsUrl ? `<a href="${cached.googleMapsUrl}" target="_blank" style="padding:7px 14px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);color:var(--google-green);border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-decoration:none;">Google Maps ↗</a>` : ''}
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text-muted);">Last fetched: ${lastFetchedStr}</div>
+      <div class="ratings-grid">
+        <div class="rating-block">
+          <div class="rating-source google">Google Reviews</div>
+          <div class="rating-main"><span class="rating-number google">${hotel.rating || '—'}</span><span class="rating-max">/ 5</span></div>
+          <div class="stars-row">${starsHtml(hotel.rating || 0)}</div>
+          <div class="rating-count">${(hotel.totalRatings || 0).toLocaleString()} reviews</div>
+        </div>
+      </div>
+    </div>
+    <div class="tabs" style="margin-bottom:20px;">
+      <div class="tab active" id="tab-reviews" onclick="switchTab('reviews')">Reviews</div>
+      <div class="tab" id="tab-photos" onclick="switchTab('photos')">Photos ${photos.length > 0 ? `<span style="opacity:0.6;font-size:11px;">(${photos.length})</span>` : ''}</div>
+    </div>
+    <div class="tab-content active" id="tab-content-reviews">
+      ${renderSearchReviews(cached.reviews || [])}
+    </div>
+    <div class="tab-content" id="tab-content-photos">
+      ${renderPhotos(photos)}
+    </div>`;
+}
+
+async function refreshSavedHotel(folderId, placeId) {
+  const btn = document.getElementById('saved-refresh-btn');
+  if (btn) { btn.classList.add('spinning'); btn.textContent = '↻ Refreshing…'; }
+  try {
+    const r = await fetch(`/api/folders/${encodeURIComponent(folderId)}/hotels/${encodeURIComponent(placeId)}/refresh`, { method: 'POST' }).then(r => r.json());
+    if (r.error) throw new Error(r.error);
+    await loadFolders();
+    await selectSavedHotel(folderId, placeId);
+  } catch (err) {
+    if (btn) { btn.classList.remove('spinning'); btn.textContent = '↻ Refresh'; }
+    alert('Refresh failed: ' + err.message);
+  }
+}
+
+async function removeFromFolder(folderId, placeId, hotelName) {
+  if (!confirm(`Remove "${hotelName}" from this folder?`)) return;
+  try {
+    const r = await fetch(`/api/folders/${encodeURIComponent(folderId)}/hotels/${encodeURIComponent(placeId)}`, { method: 'DELETE' }).then(r => r.json());
+    if (r.error) { alert(r.error); return; }
+    const folder = folders.find(f => f.id === folderId);
+    if (folder) folder.hotels = folder.hotels.filter(h => h.placeId !== placeId);
+    if (selectedFolderHotel?.folderId === folderId && selectedFolderHotel?.placeId === placeId) { selectedFolderHotel = null; showWelcome(); }
+    renderFolders();
+  } catch (err) {
+    alert('Failed to remove: ' + err.message);
+  }
+}
+
+function timeAgo(date) {
+  const s = Math.floor((Date.now() - date) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
 // ─────────────────────────────────────────
@@ -1124,6 +1473,7 @@ async function selectSearchResult(placeId, el) {
 }
 
 function renderSearchOverview(hotel) {
+  currentSearchHotel = hotel;
   const photos = hotel.photos || [];
   lightboxPhotos = photos;
   document.getElementById('overview-content').innerHTML = `
@@ -1134,7 +1484,11 @@ function renderSearchOverview(hotel) {
           <div class="property-title">${escHtml(hotel.name)}</div>
           <div class="property-location"><span>📍</span><span>${escHtml(hotel.address || '')}</span></div>
         </div>
-        <div style="display:flex;gap:8px;flex-shrink:0;">
+        <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-start;">
+          <div class="save-dropdown-wrap">
+            <button class="save-btn" id="save-btn" onclick="openSaveDropdown(currentSearchHotel)">Save ▾</button>
+            <div class="save-dropdown" id="save-dropdown"></div>
+          </div>
           ${hotel.googleMapsUrl ? `<a href="${hotel.googleMapsUrl}" target="_blank" style="padding:7px 14px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);color:var(--google-green);border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-decoration:none;">Google Maps ↗</a>` : ''}
         </div>
       </div>
