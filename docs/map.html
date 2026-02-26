@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio Intel — Portfolio Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <style>
+    :root {
+      --bg: #0c0f14;
+      --surface: #141820;
+      --surface2: #1c2230;
+      --border: #252d3d;
+      --border-light: #2d3650;
+      --accent: #c8a96e;
+      --accent-dim: rgba(200, 169, 110, 0.15);
+      --google-green: #4ade80;
+      --ta-green: #34d399;
+      --text: #e8eaf0;
+      --text-dim: #8891a8;
+      --text-muted: #4f5a72;
+      --star: #f59e0b;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-size: 14px;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .logo-text {
+      font-family: 'DM Serif Display', serif;
+      font-size: 18px;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+
+    .btn-back {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+
+    .btn-back:hover {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .property-count {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    #map {
+      flex: 1;
+      z-index: 1;
+    }
+
+    /* Dark map tiles overrides */
+    .leaflet-container {
+      background: var(--bg);
+    }
+
+    /* Popup styling */
+    .leaflet-popup-content-wrapper {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .leaflet-popup-tip {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+    }
+
+    .leaflet-popup-close-button {
+      color: var(--text-muted) !important;
+      font-size: 18px !important;
+      top: 6px !important;
+      right: 8px !important;
+    }
+
+    .leaflet-popup-close-button:hover {
+      color: var(--text) !important;
+    }
+
+    .leaflet-popup-content {
+      margin: 14px 16px;
+      line-height: 1.5;
+    }
+
+    .popup-brand {
+      display: inline-block;
+      padding: 2px 8px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .popup-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 15px;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .popup-address {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .popup-ratings {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .popup-rating {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .popup-rating .label {
+      color: var(--text-muted);
+      font-weight: 400;
+      font-size: 11px;
+    }
+
+    .popup-rating.google .value { color: var(--google-green); }
+    .popup-rating.ta .value { color: var(--ta-green); }
+
+    .popup-rating .star {
+      color: var(--star);
+      font-size: 11px;
+    }
+
+    .popup-link {
+      display: inline-block;
+      padding: 5px 12px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(200, 169, 110, 0.25);
+      color: var(--accent);
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+
+    .popup-link:hover {
+      background: rgba(200, 169, 110, 0.25);
+    }
+
+    /* Custom marker */
+    .custom-marker {
+      background: var(--accent);
+      border: 2px solid rgba(255,255,255,0.9);
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      transition: transform 0.15s;
+    }
+
+    .custom-marker:hover {
+      transform: scale(1.3);
+    }
+
+    /* Leaflet zoom controls */
+    .leaflet-control-zoom a {
+      background: var(--surface) !important;
+      border-color: var(--border) !important;
+      color: var(--text-dim) !important;
+    }
+
+    .leaflet-control-zoom a:hover {
+      background: var(--surface2) !important;
+      color: var(--text) !important;
+    }
+
+    .leaflet-control-attribution {
+      background: rgba(12, 15, 20, 0.8) !important;
+      color: var(--text-muted) !important;
+      font-size: 10px !important;
+    }
+
+    .leaflet-control-attribution a {
+      color: var(--text-dim) !important;
+    }
+
+    /* Marker cluster styling */
+    .marker-cluster {
+      background: rgba(200, 169, 110, 0.25);
+      border-radius: 50%;
+    }
+
+    .marker-cluster div {
+      background: var(--accent);
+      color: var(--bg);
+      border-radius: 50%;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      width: 32px;
+      height: 32px;
+      margin: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .marker-cluster-small {
+      background: rgba(200, 169, 110, 0.2);
+    }
+
+    .marker-cluster-medium {
+      background: rgba(200, 169, 110, 0.3);
+    }
+
+    .marker-cluster-large {
+      background: rgba(200, 169, 110, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🗺</div>
+    <div>
+      <div class="logo-text">Portfolio Intel</div>
+      <div class="logo-sub">Portfolio Map</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="property-count" id="property-count"></span>
+    <a href="./index.html" class="btn btn-back">Dashboard</a>
+  </div>
+</header>
+
+<div id="map"></div>
+
+<script>
+const COORDS = {
+  1:  [39.6173, -104.8984],
+  2:  [39.7392, -105.1556],
+  3:  [41.8925, -87.6281],
+  4:  [39.1178, -77.2014],
+  5:  [29.9822, -95.3422],
+  6:  [21.2743, -157.8234],
+  7:  [38.9559, -77.3592],
+  8:  [29.7544, -95.3632],
+  9:  [33.8463, -84.3621],
+  10: [44.9778, -93.2697],
+  11: [39.8769, -75.2433],
+  12: [27.9772, -82.5311],
+  13: [29.7565, -95.3557],
+  14: [39.9575, -75.1716],
+  15: [47.6062, -122.3355],
+  16: [41.8997, -87.6243],
+  17: [47.6117, -122.3360],
+  18: [42.3876, -71.2352],
+};
+
+// Dark tile layer
+const map = L.map('map', { zoomControl: true });
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 19,
+}).addTo(map);
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function ratingHtml(value, source) {
+  if (!value) return `<span class="label">${source === 'google' ? 'Google' : 'TA'}: </span><span style="color:var(--text-muted);">—</span>`;
+  return `<span class="label">${source === 'google' ? 'Google' : 'TA'}: </span><span class="value">${value}</span><span class="star"> ★</span>`;
+}
+
+fetch('./data/portfolio.json')
+  .then(r => r.json())
+  .then(portfolio => {
+    document.getElementById('property-count').textContent = portfolio.length + ' properties';
+
+    const clusterGroup = L.markerClusterGroup({
+      maxClusterRadius: 45,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      spiderfyDistanceMultiplier: 2,
+      iconCreateFunction: function(cluster) {
+        const count = cluster.getChildCount();
+        let size = 'small';
+        if (count >= 5) size = 'medium';
+        if (count >= 10) size = 'large';
+        return L.divIcon({
+          html: '<div>' + count + '</div>',
+          className: 'marker-cluster marker-cluster-' + size,
+          iconSize: [40, 40],
+        });
+      },
+    });
+
+    portfolio.forEach(p => {
+      const coord = COORDS[p.id];
+      if (!coord) return;
+
+      const icon = L.divIcon({
+        className: 'custom-marker',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+        popupAnchor: [0, -10],
+      });
+
+      const gRating = p.google?.rating || null;
+      const taRating = p.tripadvisor?.rating || null;
+      const address = escHtml(p.address || p.google?.address || `${p.city}, ${p.state}`);
+
+      const popup = `
+        <div>
+          <div class="popup-brand">${escHtml(p.brand)}</div>
+          <div class="popup-name">${escHtml(p.name)}</div>
+          <div class="popup-address">${address}</div>
+          <div class="popup-ratings">
+            <div class="popup-rating google">${ratingHtml(gRating, 'google')}</div>
+            <div class="popup-rating ta">${ratingHtml(taRating, 'ta')}</div>
+          </div>
+          <a href="./index.html#property=${p.id}" class="popup-link">View Details →</a>
+        </div>
+      `;
+
+      const marker = L.marker(coord, { icon }).bindPopup(popup, { maxWidth: 280 });
+      clusterGroup.addLayer(marker);
+    });
+
+    map.addLayer(clusterGroup);
+
+    // Fit map to all markers
+    if (clusterGroup.getLayers().length > 0) {
+      map.fitBounds(clusterGroup.getBounds().pad(0.15));
+    }
+  })
+  .catch(err => {
+    console.error('Failed to load portfolio data:', err);
+  });
+</script>
+</body>
+</html>
