@@ -1027,6 +1027,7 @@ let selectedFolderHotel = null;
 let selectedFolder = null;
 let currentFolderMap = null;
 let currentSearchHotel = null;
+let activeSearchReviewSource = 'all';
 
 // ─────────────────────────────────────────
 //  Init
@@ -1269,7 +1270,7 @@ async function saveToFolder(folderId, folderName) {
     const result = await fetch(`/api/folders/${encodeURIComponent(folderId)}/hotels`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ placeId: h.placeId, name: h.name, address: h.address, rating: h.rating, totalRatings: h.totalRatings })
+      body: JSON.stringify({ placeId: h.placeId, name: h.name, address: h.address, rating: h.rating, totalRatings: h.totalRatings, taLocationId: h.tripadvisor?.locationId || null })
     }).then(r => r.json());
     if (result.error === 'Hotel already in folder') {
       if (btn) { btn.textContent = 'Save ▾'; btn.disabled = false; }
@@ -1323,9 +1324,24 @@ async function selectSavedHotel(folderId, placeId) {
 
 function renderSavedHotelOverview(hotel) {
   const cached = hotel.cachedData || {};
-  const photos = cached.photos || [];
-  lightboxPhotos = photos;
+  const ta = cached.tripadvisor || null;
+  activeSearchReviewSource = 'all';
+  currentSearchHotel = { reviews: cached.reviews || [], photos: cached.photos || [], tripadvisor: ta };
+  const googlePhotos = cached.photos || [];
+  const taPhotos = (ta?.photos || []).map(ph => ({
+    url: ph.images?.large || ph.images?.medium || ph.images?.small || ph.images?.original,
+    source: 'ta', caption: ph.caption,
+  }));
+  const allPhotos = [...googlePhotos, ...taPhotos];
+  lightboxPhotos = allPhotos;
   const lastFetchedStr = hotel.lastFetched ? timeAgo(new Date(hotel.lastFetched)) : 'never';
+  const taSubratingHtml = ta?.subratings
+    ? Object.values(ta.subratings).map(s => `
+        <div class="subrating-item">
+          <span class="subrating-label">${escHtml(s.name)}</span>
+          <span class="subrating-value">${s.value} <span style="color:var(--star);font-size:10px;">★</span></span>
+        </div>`).join('')
+    : '';
   document.getElementById('overview-content').innerHTML = `
     <div class="property-header" style="margin-bottom:20px;">
       <div class="property-title-row">
@@ -1340,6 +1356,7 @@ function renderSavedHotelOverview(hotel) {
             ↻ Refresh
           </button>
           ${cached.googleMapsUrl ? `<a href="${cached.googleMapsUrl}" target="_blank" style="padding:7px 14px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);color:var(--google-green);border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-decoration:none;">Google Maps ↗</a>` : ''}
+          ${ta?.tripadvisorUrl ? `<a href="${ta.tripadvisorUrl}" target="_blank" style="padding:7px 14px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25);color:var(--ta-green);border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-decoration:none;">TripAdvisor ↗</a>` : ''}
         </div>
       </div>
       <div style="margin-top:8px;font-size:11px;color:var(--text-muted);">Last fetched: ${lastFetchedStr}</div>
@@ -1350,17 +1367,26 @@ function renderSavedHotelOverview(hotel) {
           <div class="stars-row">${starsHtml(hotel.rating || 0)}</div>
           <div class="rating-count">${(hotel.totalRatings || 0).toLocaleString()} reviews</div>
         </div>
+        ${ta ? `
+        <div class="rating-block">
+          <div class="rating-source ta">TripAdvisor</div>
+          <div class="rating-main"><span class="rating-number ta">${ta.rating || '—'}</span><span class="rating-max">/ 5</span></div>
+          <div class="stars-row">${starsHtml(ta.rating || 0)}</div>
+          <div class="rating-count">${ta.numReviews || 0} reviews</div>
+          ${taSubratingHtml ? `<div class="subratings">${taSubratingHtml}</div>` : ''}
+          ${ta.rankingString ? `<div class="ranking-badge">${escHtml(ta.rankingString)}</div>` : ''}
+        </div>` : ''}
       </div>
     </div>
     <div class="tabs" style="margin-bottom:20px;">
       <div class="tab active" id="tab-reviews" onclick="switchTab('reviews')">Reviews</div>
-      <div class="tab" id="tab-photos" onclick="switchTab('photos')">Photos ${photos.length > 0 ? `<span style="opacity:0.6;font-size:11px;">(${photos.length})</span>` : ''}</div>
+      <div class="tab" id="tab-photos" onclick="switchTab('photos')">Photos ${allPhotos.length > 0 ? `<span style="opacity:0.6;font-size:11px;">(${allPhotos.length})</span>` : ''}</div>
     </div>
     <div class="tab-content active" id="tab-content-reviews">
-      ${renderSearchReviews(cached.reviews || [])}
+      ${renderSearchDualReviews(cached.reviews || [], ta?.reviews || [])}
     </div>
     <div class="tab-content" id="tab-content-photos">
-      ${renderPhotos(photos)}
+      ${renderPhotos(allPhotos)}
     </div>`;
 }
 
@@ -1599,7 +1625,7 @@ async function doSearch(q) {
       return;
     }
     list.innerHTML = results.map(r => `
-      <div class="property-item" onclick="selectSearchResult('${escHtml(r.placeId)}', this)">
+      <div class="property-item" data-place-id="${escHtml(r.placeId)}" data-hotel-name="${escHtml(r.name)}" onclick="selectSearchResult(this.dataset.placeId, this, this.dataset.hotelName)">
         <div class="property-item-name">${escHtml(r.name)}</div>
         <div class="property-item-meta">
           <span class="property-item-city">${escHtml(r.address?.split(',').slice(-3,-1).join(',').trim() || '')}</span>
@@ -1611,7 +1637,7 @@ async function doSearch(q) {
   }
 }
 
-async function selectSearchResult(placeId, el) {
+async function selectSearchResult(placeId, el, name) {
   document.querySelectorAll('#property-list .property-item').forEach(e => e.classList.remove('active'));
   el.classList.add('active');
   selectedId = null;
@@ -1620,19 +1646,42 @@ async function selectSearchResult(placeId, el) {
   document.getElementById('view-overview').style.display = 'block';
   document.getElementById('overview-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
-    const hotel = await fetch(`/api/hotel?placeId=${encodeURIComponent(placeId)}`).then(r => r.json());
+    const [hotel, taResults] = await Promise.all([
+      fetch(`/api/hotel?placeId=${encodeURIComponent(placeId)}`).then(r => r.json()),
+      name ? fetch(`/api/ta-search?q=${encodeURIComponent(name)}`).then(r => r.json()).catch(() => []) : Promise.resolve([]),
+    ]);
     if (hotel.error) throw new Error(hotel.error);
-    renderSearchOverview(hotel);
+    let taData = null;
+    if (Array.isArray(taResults) && taResults.length > 0) {
+      taData = await fetch(`/api/ta-hotel?locationId=${encodeURIComponent(taResults[0].locationId)}`).then(r => r.json()).catch(() => null);
+      if (taData?.error) taData = null;
+    }
+    renderSearchOverview(hotel, taData);
   } catch (err) {
     document.getElementById('overview-content').innerHTML =
       `<div style="padding:32px;color:var(--red);">Failed to load: ${escHtml(err.message)}</div>`;
   }
 }
 
-function renderSearchOverview(hotel) {
-  currentSearchHotel = hotel;
-  const photos = hotel.photos || [];
-  lightboxPhotos = photos;
+function renderSearchOverview(hotel, taData) {
+  activeSearchReviewSource = 'all';
+  currentSearchHotel = { ...hotel, tripadvisor: taData };
+  const googlePhotos = hotel.photos || [];
+  const taPhotos = (taData?.photos || []).map(ph => ({
+    url: ph.images?.large || ph.images?.medium || ph.images?.small || ph.images?.original,
+    source: 'ta', caption: ph.caption,
+  }));
+  const allPhotos = [...googlePhotos, ...taPhotos];
+  lightboxPhotos = allPhotos;
+
+  const taSubratingHtml = taData?.subratings
+    ? Object.values(taData.subratings).map(s => `
+        <div class="subrating-item">
+          <span class="subrating-label">${escHtml(s.name)}</span>
+          <span class="subrating-value">${s.value} <span style="color:var(--star);font-size:10px;">★</span></span>
+        </div>`).join('')
+    : '';
+
   document.getElementById('overview-content').innerHTML = `
     <div class="property-header" style="margin-bottom:20px;">
       <div class="property-title-row">
@@ -1647,6 +1696,7 @@ function renderSearchOverview(hotel) {
             <div class="save-dropdown" id="save-dropdown"></div>
           </div>
           ${hotel.googleMapsUrl ? `<a href="${hotel.googleMapsUrl}" target="_blank" style="padding:7px 14px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);color:var(--google-green);border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-decoration:none;">Google Maps ↗</a>` : ''}
+          ${taData?.tripadvisorUrl ? `<a href="${taData.tripadvisorUrl}" target="_blank" style="padding:7px 14px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25);color:var(--ta-green);border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-decoration:none;">TripAdvisor ↗</a>` : ''}
         </div>
       </div>
       <div class="ratings-grid">
@@ -1659,20 +1709,107 @@ function renderSearchOverview(hotel) {
           <div class="stars-row">${starsHtml(hotel.rating || 0)}</div>
           <div class="rating-count">${(hotel.totalRatings || 0).toLocaleString()} reviews</div>
         </div>
+        ${taData ? `
+        <div class="rating-block">
+          <div class="rating-source ta">TripAdvisor</div>
+          <div class="rating-main">
+            <span class="rating-number ta">${taData.rating || '—'}</span>
+            <span class="rating-max">/ 5</span>
+          </div>
+          <div class="stars-row">${starsHtml(taData.rating || 0)}</div>
+          <div class="rating-count">${taData.numReviews || 0} reviews</div>
+          ${taSubratingHtml ? `<div class="subratings">${taSubratingHtml}</div>` : ''}
+          ${taData.rankingString ? `<div class="ranking-badge">${escHtml(taData.rankingString)}</div>` : ''}
+        </div>` : ''}
       </div>
     </div>
     <div class="tabs" style="margin-bottom:20px;">
       <div class="tab active" id="tab-reviews" onclick="switchTab('reviews')">Reviews</div>
       <div class="tab" id="tab-photos" onclick="switchTab('photos')">
-        Photos ${photos.length > 0 ? `<span style="opacity:0.6;font-size:11px;">(${photos.length})</span>` : ''}
+        Photos ${allPhotos.length > 0 ? `<span style="opacity:0.6;font-size:11px;">(${allPhotos.length})</span>` : ''}
       </div>
     </div>
     <div class="tab-content active" id="tab-content-reviews">
-      ${renderSearchReviews(hotel.reviews || [])}
+      ${renderSearchDualReviews(hotel.reviews || [], taData?.reviews || [])}
     </div>
     <div class="tab-content" id="tab-content-photos">
-      ${renderPhotos(photos)}
+      ${renderPhotos(allPhotos)}
     </div>`;
+}
+
+function renderSearchDualReviews(googleReviews, taReviews) {
+  const hasGoogle = googleReviews.length > 0;
+  const hasTA = taReviews.length > 0;
+  if (!hasGoogle && !hasTA) {
+    return `<div class="no-data"><div class="no-data-icon">💬</div><div class="no-data-text">No reviews available</div></div>`;
+  }
+  const source = activeSearchReviewSource;
+  const gCards = googleReviews.map(r => `
+    <div class="review-card">
+      <div class="review-header">
+        <div class="reviewer-info">
+          <div class="reviewer-avatar">
+            ${r.profilePhoto ? `<img src="${r.profilePhoto}" onerror="this.parentNode.textContent='👤'" alt="">` : '👤'}
+          </div>
+          <div>
+            <div class="reviewer-name">${escHtml(r.author)}</div>
+            <div class="review-rating-stars">
+              ${Array.from({length:5},(_,i)=>`<span class="review-star ${i<r.rating?'':'empty'}">★</span>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="review-date">${r.timeDescription || ''}</div>
+          <div style="margin-top:3px;"><span class="badge badge-google" style="font-size:9px;padding:2px 6px;">Google</span></div>
+        </div>
+      </div>
+      <div class="review-text">${truncateText(escHtml(r.text || ''), 280)}</div>
+    </div>`).join('');
+  const taCards = taReviews.map(r => `
+    <div class="review-card">
+      <div class="review-header">
+        <div class="reviewer-info">
+          <div class="reviewer-avatar">👤</div>
+          <div>
+            <div class="reviewer-name">${escHtml(r.user?.username || 'Guest')}</div>
+            ${r.user?.userLocation ? `<div class="reviewer-location">${escHtml(r.user.userLocation)}</div>` : ''}
+            <div class="review-rating-stars">
+              ${Array.from({length:5},(_,i)=>`<span class="review-star ${i<r.rating?'':'empty'}">★</span>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="review-date">${r.publishedDate ? new Date(r.publishedDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</div>
+          ${r.tripType ? `<div class="review-trip-type" style="margin-top:3px;">${r.tripType.replace('_',' ')}</div>` : ''}
+          <div style="margin-top:3px;"><span class="badge badge-ta" style="font-size:9px;padding:2px 6px;">TripAdvisor</span></div>
+        </div>
+      </div>
+      ${r.title ? `<div class="review-title" style="margin-bottom:6px;">${escHtml(r.title)}</div>` : ''}
+      <div class="review-text">${truncateText(escHtml(r.text || ''), 280)}</div>
+    </div>`).join('');
+  return `
+    <div class="reviews-header">
+      <span style="font-size:13px;color:var(--text-muted);">${googleReviews.length + taReviews.length} reviews loaded</span>
+      <div class="source-toggle">
+        ${hasGoogle ? `<button class="source-btn google search-source-btn ${source==='google'?'active':''}" data-source="google" onclick="setSearchReviewSource('google')">Google (${googleReviews.length})</button>` : ''}
+        ${hasTA ? `<button class="source-btn ta search-source-btn ${source==='ta'?'active':''}" data-source="ta" onclick="setSearchReviewSource('ta')">TripAdvisor (${taReviews.length})</button>` : ''}
+        ${hasGoogle && hasTA ? `<button class="source-btn search-source-btn ${source==='all'?'active':''}" data-source="all" style="${source==='all'?'background:var(--surface2);color:var(--text-dim);border-color:var(--border-light);':''}" onclick="setSearchReviewSource('all')">All</button>` : ''}
+      </div>
+    </div>
+    <div class="reviews-grid">
+      ${source === 'google' ? gCards : source === 'ta' ? taCards : gCards + taCards}
+    </div>`;
+}
+
+function setSearchReviewSource(source) {
+  activeSearchReviewSource = source;
+  const tabContent = document.getElementById('tab-content-reviews');
+  if (tabContent && currentSearchHotel) {
+    tabContent.innerHTML = renderSearchDualReviews(
+      currentSearchHotel.reviews || [],
+      currentSearchHotel.tripadvisor?.reviews || []
+    );
+  }
 }
 
 function renderSearchReviews(reviews) {
