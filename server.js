@@ -70,7 +70,7 @@ async function fetchHotelDetails(placeId) {
   const r = await axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
     params: {
       place_id: placeId,
-      fields: 'name,rating,user_ratings_total,reviews,photos,website,formatted_phone_number,url,formatted_address',
+      fields: 'name,rating,user_ratings_total,reviews,photos,website,formatted_phone_number,url,formatted_address,geometry',
       key: apiKey
     }
   });
@@ -81,6 +81,8 @@ async function fetchHotelDetails(placeId) {
     address: d.formatted_address,
     rating: d.rating,
     totalRatings: d.user_ratings_total,
+    lat: d.geometry?.location?.lat,
+    lng: d.geometry?.location?.lng,
     googleMapsUrl: d.url,
     website: d.website,
     phone: d.formatted_phone_number,
@@ -179,7 +181,8 @@ app.get('/api/folders', (req, res) => {
     hotels: f.hotels.map(h => ({
       placeId: h.placeId, name: h.name, address: h.address,
       rating: h.rating, totalRatings: h.totalRatings,
-      savedAt: h.savedAt, lastFetched: h.lastFetched
+      savedAt: h.savedAt, lastFetched: h.lastFetched,
+      lat: h.lat, lng: h.lng
     }))
   }));
   res.json(slim);
@@ -222,6 +225,7 @@ app.post('/api/folders/:id/hotels', async (req, res) => {
     const hotel = {
       placeId, name: full.name || name, address: full.address || address,
       rating: full.rating ?? rating, totalRatings: full.totalRatings ?? totalRatings,
+      lat: full.lat, lng: full.lng,
       savedAt: now, lastFetched: now,
       cachedData: { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos }
     };
@@ -257,6 +261,8 @@ app.post('/api/folders/:folderId/hotels/:placeId/refresh', async (req, res) => {
     const full = await fetchHotelDetails(req.params.placeId);
     hotel.rating = full.rating;
     hotel.totalRatings = full.totalRatings;
+    hotel.lat = full.lat;
+    hotel.lng = full.lng;
     hotel.lastFetched = new Date().toISOString();
     hotel.cachedData = { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos };
     savePortfolios(data);
@@ -274,6 +280,15 @@ app.get('/api/folders/:folderId/hotels/:placeId', (req, res) => {
   const hotel = folder.hotels.find(h => h.placeId === req.params.placeId);
   if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
   res.json({ ...hotel, folderId: folder.id, folderName: folder.name });
+});
+
+// API: status — which API keys are configured
+app.get('/api/status', (req, res) => {
+  res.json({
+    google: !!(process.env.GOOGLE_PLACES_API_KEY && process.env.GOOGLE_PLACES_API_KEY !== 'your_google_places_api_key_here'),
+    tripadvisor: !!(process.env.TRIPADVISOR_API_KEY && process.env.TRIPADVISOR_API_KEY !== 'your_tripadvisor_api_key_here'),
+    github: !!(process.env.GITHUB_TOKEN && process.env.GITHUB_REPO),
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
