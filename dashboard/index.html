@@ -1327,6 +1327,7 @@ async function selectSavedHotel(folderId, placeId) {
     if (hotel.error) throw new Error(hotel.error);
     renderSavedHotelOverview(hotel);
     if (!hotel.numRooms) fetchAndDisplayRooms(hotel.name, hotel.address);
+    fetchAndDisplaySentiment(hotel.name, hotel.cachedData?.reviews || [], hotel.cachedData?.tripadvisor?.reviews || []);
   } catch (err) {
     document.getElementById('overview-content').innerHTML = `<div style="padding:32px;color:var(--red);">Failed to load: ${escHtml(err.message)}</div>`;
   }
@@ -1390,6 +1391,9 @@ function renderSavedHotelOverview(hotel) {
           ${ta.rankingString ? `<div class="ranking-badge">${escHtml(ta.rankingString)}</div>` : ''}
         </div>` : ''}
       </div>
+    </div>
+    <div id="review-analysis" style="margin-bottom:16px;">
+      <div style="font-size:12px;font-style:italic;color:var(--text-muted);padding:6px 0;">✨ Analyzing reviews…</div>
     </div>
     <div class="tabs" style="margin-bottom:20px;">
       <div class="tab active" id="tab-reviews" onclick="switchTab('reviews')">Reviews</div>
@@ -1682,6 +1686,7 @@ async function selectSearchResult(placeId, el, name) {
     }
     renderSearchOverview(hotel, taData, taError);
     fetchAndDisplayRooms(hotel.name, hotel.address);
+    fetchAndDisplaySentiment(hotel.name, hotel.reviews || [], taData?.reviews || []);
   } catch (err) {
     document.getElementById('overview-content').innerHTML =
       `<div style="padding:32px;color:var(--red);">Failed to load: ${escHtml(err.message)}</div>`;
@@ -1752,6 +1757,9 @@ function renderSearchOverview(hotel, taData, taError) {
           <div style="color:var(--red);font-size:11px;margin-top:8px;line-height:1.5;">⚠ ${escHtml(taError)}</div>
         </div>` : ''}
       </div>
+    </div>
+    <div id="review-analysis" style="margin-bottom:16px;">
+      <div style="font-size:12px;font-style:italic;color:var(--text-muted);padding:6px 0;">✨ Analyzing reviews…</div>
     </div>
     <div class="tabs" style="margin-bottom:20px;">
       <div class="tab active" id="tab-reviews" onclick="switchTab('reviews')">Reviews</div>
@@ -2293,6 +2301,49 @@ async function fetchAndDisplayRooms(name, address) {
     }
   } catch {
     document.getElementById('rooms-gem')?.remove();
+  }
+}
+
+// ─────────────────────────────────────────
+//  Gemini Review Sentiment Analysis
+// ─────────────────────────────────────────
+async function fetchAndDisplaySentiment(name, googleReviews, taReviews) {
+  const el = document.getElementById('review-analysis');
+  if (!el) return;
+  if (!googleReviews?.length && !taReviews?.length) { el.remove(); return; }
+  try {
+    const r = await fetch('/api/review-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, googleReviews: googleReviews || [], taReviews: taReviews || [] })
+    });
+    if (!r.ok) { el.remove(); return; }
+    const { summary, top3best = [], top3worst = [] } = await r.json();
+    if (!summary) { el.remove(); return; }
+
+    const quoteCard = (q, positive) =>
+      `<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid ${positive ? 'var(--green)' : 'var(--red)'};border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:12px;line-height:1.6;color:var(--text);">"${escHtml(q.quote)}"</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">${starsHtml(q.rating)}&nbsp;${escHtml(q.author)} · <span style="opacity:0.7;">${escHtml(q.source)}</span></div>
+      </div>`;
+
+    el.innerHTML =
+      `<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:4px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">✨ AI Review Analysis</div>
+        <p style="font-size:13px;line-height:1.65;color:var(--text);margin:0 0 16px;">${escHtml(summary)}</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">🌟 Top Highlights</div>
+            ${top3best.map(q => quoteCard(q, true)).join('')}
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">⚠️ Top Concerns</div>
+            ${top3worst.map(q => quoteCard(q, false)).join('')}
+          </div>
+        </div>
+      </div>`;
+  } catch {
+    el.remove();
   }
 }
 
