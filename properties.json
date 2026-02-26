@@ -1,0 +1,182 @@
+[
+  {
+    "id": 1,
+    "name": "Denver Tech Center Marriott",
+    "brand": "Marriott",
+    "city": "Denver",
+    "state": "CO",
+    "googleQuery": "Denver Tech Center Marriott Hotel Colorado",
+    "tripadvisorQuery": "Marriott Denver Tech Center",
+    "address": "4900 S Syracuse St, Denver, CO 80237"
+  },
+  {
+    "id": 2,
+    "name": "Denver West Marriott",
+    "brand": "Marriott",
+    "city": "Denver",
+    "state": "CO",
+    "googleQuery": "Denver West Marriott Hotel Colorado",
+    "tripadvisorQuery": "Marriott Denver West",
+    "address": "1717 Denver West Blvd, Golden, CO 80401"
+  },
+  {
+    "id": 3,
+    "name": "Embassy Suites Chicago",
+    "brand": "Embassy Suites",
+    "city": "Chicago",
+    "state": "IL",
+    "googleQuery": "Embassy Suites Chicago Downtown Hotel",
+    "tripadvisorQuery": "Embassy Suites by Hilton Chicago Downtown",
+    "address": "600 N State St, Chicago, IL 60654"
+  },
+  {
+    "id": 4,
+    "name": "Gaithersburg Marriott",
+    "brand": "Marriott",
+    "city": "Gaithersburg",
+    "state": "MD",
+    "googleQuery": "Marriott Gaithersburg Washingtonian Center Maryland",
+    "tripadvisorQuery": "Marriott Gaithersburg Washingtonian",
+    "address": "9751 Washingtonian Blvd, Gaithersburg, MD 20878"
+  },
+  {
+    "id": 5,
+    "name": "Houston Airport Marriott",
+    "brand": "Marriott",
+    "city": "Houston",
+    "state": "TX",
+    "googleQuery": "Houston Airport Marriott at George Bush Intercontinental",
+    "tripadvisorQuery": "Houston Airport Marriott George Bush Intercontinental",
+    "address": "18700 John F Kennedy Blvd, Houston, TX 77032"
+  },
+  {
+    "id": 6,
+    "name": "Hyatt Place Waikiki Beach",
+    "brand": "Hyatt Place",
+    "city": "Honolulu",
+    "state": "HI",
+    "googleQuery": "Hyatt Place Waikiki Beach Hotel Honolulu Hawaii",
+    "tripadvisorQuery": "Hyatt Place Waikiki Beach",
+    "address": "175 Paoakalani Ave, Honolulu, HI 96815"
+  },
+  {
+    "id": 7,
+    "name": "Hyatt Regency Reston",
+    "brand": "Hyatt Regency",
+    "city": "Reston",
+    "state": "VA",
+    "googleQuery": "Hyatt Regency Reston Virginia Hotel",
+    "tripadvisorQuery": "Hyatt Regency Reston",
+    "address": "1800 Presidents St, Reston, VA 20190"
+  },
+  {
+    "id": 8,
+    "name": "JW Marriott Houston",
+    "brand": "JW Marriott",
+    "city": "Houston",
+    "state": "TX",
+    "googleQuery": "JW Marriott Houston Downtown Texas Hotel",
+    "tripadvisorQuery": "JW Marriott Houston Downtown",
+    "address": "806 Main St, Houston, TX 77002"
+  },
+  {
+    "id": 9,
+    "name": "JW Marriott Buckhead Atlanta",
+    "brand": "JW Marriott",
+    "city": "Atlanta",
+    "state": "GA",
+    "googleQuery": "JW Marriott Buckhead Atlanta Georgia Hotel",
+    "tripadvisorQuery": "JW Marriott Atlanta Buckhead",
+    "address": "3300 Lenox Rd NE, Atlanta, GA 30326"
+  },
+  {
+    "id": 10,
+    "name": "Minneapolis City Center Marriott",
+    "brand": "Marriott",
+    "city": "Minneapolis",
+    "state": "MN",
+    "googleQuery": "Minneapolis City Center Marriott Hotel Minnesota",
+    "tripadvisorQuery": "Marriott Minneapolis City Center",
+    "address": "30 S 7th St, Minneapolis, MN 55402"
+  },
+  {
+    "id": 11,
+    "name": "Philadelphia Airport Marriott",
+    "brand": "Marriott",
+    "city": "Philadelphia",
+    "state": "PA",
+    "googleQuery": "Philadelphia Airport Marriott Hotel Pennsylvania",
+    "tripadvisorQuery": "Philadelphia Airport Marriott",
+    "address": "One Arrivals Rd, Philadelphia, PA 19153"
+  },
+  {
+    "id": 12,
+    "name": "Tampa Airport Marriott",
+    "brand": "Marriott",
+    "city": "Tampa",
+    "state": "FL",
+    "googleQuery": "Tampa Airport Marriott Hotel Florida",
+    "tripadvisorQuery": "Tampa Airport Marriott",
+    "address": "Tampa International Airport, Tampa, FL 33607"
+  },
+  {
+    "id": 13,
+    "name": "The Laura Hotel (Autograph Collection)",
+    "brand": "Autograph Collection",
+    "city": "Houston",
+    "state": "TX",
+    "googleQuery": "The Laura Hotel Houston Autograph Collection Marriott",
+    "tripadvisorQuery": "The Laura Hotel Houston Autograph Collection",
+    "address": "1070 Dallas St, Houston, TX 77002"
+  },
+  {
+    "id": 14,
+    "name": "The Logan (Curio Collection)",
+    "brand": "Curio Collection",
+    "city": "Philadelphia",
+    "state": "PA",
+    "googleQuery": "The Logan Philadelphia Curio Collection Hilton Hotel",
+    "tripadvisorQuery": "The Logan Philadelphia Curio Collection by Hilton",
+    "address": "One Logan Square, Philadelphia, PA 19103"
+  },
+  {
+    "id": 15,
+    "name": "W Seattle",
+    "brand": "W Hotels",
+    "city": "Seattle",
+    "state": "WA",
+    "googleQuery": "W Hotel Seattle Washington",
+    "tripadvisorQuery": "W Seattle Hotel",
+    "address": "1112 4th Ave, Seattle, WA 98101"
+  },
+  {
+    "id": 16,
+    "name": "Westin River North Chicago",
+    "brand": "Westin",
+    "city": "Chicago",
+    "state": "IL",
+    "googleQuery": "Westin Michigan Avenue Chicago River North Hotel",
+    "tripadvisorQuery": "The Westin Michigan Avenue Chicago",
+    "address": "909 N Michigan Ave, Chicago, IL 60611"
+  },
+  {
+    "id": 17,
+    "name": "Westin Seattle",
+    "brand": "Westin",
+    "city": "Seattle",
+    "state": "WA",
+    "googleQuery": "Westin Seattle Hotel Washington",
+    "tripadvisorQuery": "The Westin Seattle",
+    "address": "1900 5th Ave, Seattle, WA 98101"
+  },
+  {
+    "id": 18,
+    "name": "Westin Waltham Boston",
+    "brand": "Westin",
+    "city": "Waltham",
+    "state": "MA",
+    "googleQuery": "Westin Waltham Boston Massachusetts Hotel",
+    "tripadvisorQuery": "The Westin Waltham-Boston",
+    "address": "70 3rd Ave, Waltham, MA 02451"
+  }
+]
