@@ -838,7 +838,6 @@
   </div>
   <div class="header-right">
     <span class="last-fetch" id="last-fetch">Loading...</span>
-    <a href="./map.html" style="padding:6px 14px;background:rgba(200,169,110,0.1);border:1px solid rgba(200,169,110,0.25);color:#c8a96e;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;">Portfolio Map</a>
     <span class="badge badge-google" id="google-badge">Google</span>
     <span class="badge badge-ta" id="ta-badge">TripAdvisor</span>
   </div>
@@ -861,14 +860,6 @@
         <option value="ta-rating">Sort: TA Rating ↓</option>
         <option value="google-reviews">Sort: Google Reviews ↓</option>
       </select>
-    </div>
-
-    <div style="padding: 8px 16px; margin-top: 4px;">
-      <button
-        onclick="showPortfolio()"
-        style="width:100%;padding:8px;background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:var(--accent);border-radius:var(--radius-sm);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.04em;cursor:pointer;text-transform:uppercase;">
-        📊 Portfolio Overview
-      </button>
     </div>
 
     <div class="sidebar-section" style="margin-top:8px;">Properties</div>
@@ -900,15 +891,14 @@
       <div class="welcome-title">Select a Property</div>
       <div class="welcome-text">
         Choose a hotel from the sidebar to view its Google and TripAdvisor
-        reviews, photos, and ratings. Or click <strong>Portfolio Overview</strong> to
-        compare all 18 properties at once.
+        reviews, photos, and ratings.
       </div>
       <div style="margin-top:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);max-width:400px;text-align:left;">
         <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">No data yet?</div>
         <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">
           1. Copy <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">.env.example</code> to <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">.env</code><br>
           2. Add your API keys to <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">.env</code><br>
-          3. Run <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">npm run fetch</code> in terminal<br>
+          3. Run <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">npm run fetch</code> (or use the Refresh button in the local dashboard)<br>
           4. Come back here and refresh
         </div>
       </div>
@@ -962,6 +952,15 @@ async function init() {
     if (meta.taSuccess !== undefined) {
       document.getElementById('ta-badge').textContent =
         `TripAdvisor ${meta.taSuccess}/${meta.propertyCount}`;
+    }
+
+    // TripAdvisor diagnostic hint for static site
+    if (meta.taSuccess === 0) {
+      const taBadge = document.getElementById('ta-badge');
+      taBadge.textContent = 'TripAdvisor: no data';
+      taBadge.style.background = 'rgba(251,146,60,0.1)';
+      taBadge.style.color = '#fb923c';
+      taBadge.style.borderColor = 'rgba(251,146,60,0.3)';
     }
 
     if (!Array.isArray(data) || data.length === 0) {
@@ -1186,7 +1185,7 @@ function renderPropertyOverview(id) {
         </div>
       ` : `
         <div style="margin-top:16px;padding:16px;background:var(--surface2);border-radius:var(--radius-sm);color:var(--text-muted);font-size:13px;">
-          No data available. Run <code style="background:var(--bg);padding:1px 5px;border-radius:4px;">npm run fetch</code> to load data.
+          No data available. Run <code style="background:var(--bg);padding:1px 5px;border-radius:4px;">npm run fetch</code> or use the dashboard Refresh button to load data.
         </div>
       `}
     </div>
@@ -1226,7 +1225,7 @@ function renderReviews(p) {
     return `<div class="no-data">
       <div class="no-data-icon">💬</div>
       <div class="no-data-text">No reviews loaded yet</div>
-      <div class="no-data-hint">Run <code>npm run fetch</code> to pull review data</div>
+      <div class="no-data-hint">Run <code>npm run fetch</code> or use the dashboard Refresh button</div>
     </div>`;
   }
 
@@ -1317,7 +1316,7 @@ function renderPhotos(photos) {
     return `<div class="no-data">
       <div class="no-data-icon">📷</div>
       <div class="no-data-text">No photos loaded yet</div>
-      <div class="no-data-hint">Run <code>npm run fetch</code> to pull photo data</div>
+      <div class="no-data-hint">Run <code>npm run fetch</code> or use the dashboard Refresh button</div>
     </div>`;
   }
 
