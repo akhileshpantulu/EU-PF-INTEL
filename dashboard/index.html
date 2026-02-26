@@ -1326,6 +1326,7 @@ async function selectSavedHotel(folderId, placeId) {
     const hotel = await fetch(`/api/folders/${encodeURIComponent(folderId)}/hotels/${encodeURIComponent(placeId)}`).then(r => r.json());
     if (hotel.error) throw new Error(hotel.error);
     renderSavedHotelOverview(hotel);
+    if (!hotel.numRooms) fetchAndDisplayRooms(hotel.name, hotel.address);
   } catch (err) {
     document.getElementById('overview-content').innerHTML = `<div style="padding:32px;color:var(--red);">Failed to load: ${escHtml(err.message)}</div>`;
   }
@@ -1382,7 +1383,9 @@ function renderSavedHotelOverview(hotel) {
           <div class="rating-main"><span class="rating-number ta">${ta.rating || '—'}</span><span class="rating-max">/ 5</span></div>
           <div class="stars-row">${starsHtml(ta.rating || 0)}</div>
           <div class="rating-count">${ta.numReviews || 0} reviews</div>
-          ${ta.numRooms ? `<div class="rating-count" style="margin-top:4px;">🏨 ${ta.numRooms} rooms</div>` : ''}
+          ${hotel.numRooms
+            ? `<div class="rating-count" style="margin-top:4px;">🏨 ${hotel.numRooms} rooms</div>`
+            : `<div id="rooms-gem" class="rating-count" style="margin-top:4px;">🏨 <span id="rooms-gem-val" style="font-style:italic;color:var(--text-muted);">looking up…</span></div>`}
           ${taSubratingHtml ? `<div class="subratings">${taSubratingHtml}</div>` : ''}
           ${ta.rankingString ? `<div class="ranking-badge">${escHtml(ta.rankingString)}</div>` : ''}
         </div>` : ''}
@@ -1678,6 +1681,7 @@ async function selectSearchResult(placeId, el, name) {
       taError = taResults?.error || 'TripAdvisor search failed';
     }
     renderSearchOverview(hotel, taData, taError);
+    fetchAndDisplayRooms(hotel.name, hotel.address);
   } catch (err) {
     document.getElementById('overview-content').innerHTML =
       `<div style="padding:32px;color:var(--red);">Failed to load: ${escHtml(err.message)}</div>`;
@@ -1739,7 +1743,7 @@ function renderSearchOverview(hotel, taData, taError) {
           </div>
           <div class="stars-row">${starsHtml(taData.rating || 0)}</div>
           <div class="rating-count">${taData.numReviews || 0} reviews</div>
-          ${taData.numRooms ? `<div class="rating-count" style="margin-top:4px;">🏨 ${taData.numRooms} rooms</div>` : ''}
+          <div id="rooms-gem" class="rating-count" style="margin-top:4px;">🏨 <span id="rooms-gem-val" style="font-style:italic;color:var(--text-muted);">looking up…</span></div>
           ${taSubratingHtml ? `<div class="subratings">${taSubratingHtml}</div>` : ''}
           ${taData.rankingString ? `<div class="ranking-badge">${escHtml(taData.rankingString)}</div>` : ''}
         </div>` : taError ? `
@@ -2269,6 +2273,28 @@ document.addEventListener('keydown', e => {
     if (e.key === 'ArrowRight') lightboxNav(1);
   }
 });
+
+// ─────────────────────────────────────────
+//  Gemini Room Count
+// ─────────────────────────────────────────
+async function fetchAndDisplayRooms(name, address) {
+  try {
+    const r = await fetch(`/api/rooms-lookup?${new URLSearchParams({ name: name || '', address: address || '' })}`);
+    if (!r.ok) return;
+    const { numRooms } = await r.json();
+    const el = document.getElementById('rooms-gem-val');
+    if (!el) return; // user navigated away
+    if (numRooms) {
+      el.textContent = `${numRooms} rooms`;
+      el.style.fontStyle = 'normal';
+      el.style.color = 'var(--text)';
+    } else {
+      document.getElementById('rooms-gem')?.remove();
+    }
+  } catch {
+    document.getElementById('rooms-gem')?.remove();
+  }
+}
 
 // ─────────────────────────────────────────
 //  Helpers

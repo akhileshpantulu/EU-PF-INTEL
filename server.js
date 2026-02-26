@@ -150,6 +150,20 @@ async function fetchTAHotelDetails(locationId) {
     throw new Error(msg);
   }
 }
+
+async function lookupRoomsViaGemini(name, address) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') return null;
+  const prompt = `How many total guest rooms (keys) does the hotel "${name}" at "${address}" have? Reply with ONLY an integer. If you are not confident or the hotel is unknown, reply with null.`;
+  const res = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0, maxOutputTokens: 16 } },
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+  const raw = res.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  const n = parseInt(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PORT = parseInt(process.env.PORT || '3737');
@@ -271,6 +285,7 @@ app.get('/api/folders', (req, res) => {
     hotels: f.hotels.map(h => ({
       placeId: h.placeId, name: h.name, address: h.address,
       rating: h.rating, totalRatings: h.totalRatings,
+      numRooms: h.numRooms ?? null,
       savedAt: h.savedAt, lastFetched: h.lastFetched,
       lat: h.lat, lng: h.lng
     }))
@@ -310,15 +325,17 @@ app.post('/api/folders/:id/hotels', async (req, res) => {
     return res.status(409).json({ error: 'Hotel already in folder' });
   }
   try {
-    const [full, taFull] = await Promise.all([
+    const [full, taFull, gemRooms] = await Promise.all([
       fetchHotelDetails(placeId),
       taLocationId ? fetchTAHotelDetails(taLocationId).catch(() => null) : Promise.resolve(null),
+      lookupRoomsViaGemini(name || '', address || '').catch(() => null),
     ]);
     const now = new Date().toISOString();
     const hotel = {
       placeId, name: full.name || name, address: full.address || address,
       rating: full.rating ?? rating, totalRatings: full.totalRatings ?? totalRatings,
       lat: full.lat, lng: full.lng,
+      numRooms: gemRooms,
       savedAt: now, lastFetched: now,
       cachedData: { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos, tripadvisor: taFull }
     };
@@ -379,11 +396,24 @@ app.get('/api/folders/:folderId/hotels/:placeId', (req, res) => {
   res.json({ ...hotel, folderId: folder.id, folderName: folder.name });
 });
 
+// GET /api/rooms-lookup?name=...&address=... — Gemini-powered room count lookup
+app.get('/api/rooms-lookup', async (req, res) => {
+  const { name, address } = req.query;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  try {
+    const numRooms = await lookupRoomsViaGemini(name, address || '');
+    res.json({ numRooms });
+  } catch {
+    res.json({ numRooms: null }); // fail gracefully — never block the UI
+  }
+});
+
 // API: status — which API keys are configured
 app.get('/api/status', (req, res) => {
   res.json({
     google: !!(process.env.GOOGLE_PLACES_API_KEY && process.env.GOOGLE_PLACES_API_KEY !== 'your_google_places_api_key_here'),
     tripadvisor: !!(process.env.TRIPADVISOR_API_KEY && process.env.TRIPADVISOR_API_KEY !== 'your_tripadvisor_api_key_here'),
+    gemini: !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'),
     github: !!(process.env.GITHUB_TOKEN && process.env.GITHUB_REPO),
   });
 });
