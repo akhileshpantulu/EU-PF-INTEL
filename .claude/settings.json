@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/user/EU-PF-INTEL && npm install --silent"
+          }
+        ]
+      }
+    ]
+  }
+}

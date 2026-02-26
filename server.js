@@ -13,6 +13,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import open from 'open';
+import axios from 'axios';
+import { main as runFetch } from './scripts/fetch-all.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -59,9 +61,63 @@ app.get('/api/properties', (req, res) => {
   res.json(JSON.parse(fs.readFileSync(propsPath, 'utf8')));
 });
 
-// API: trigger re-fetch (useful for scheduled updates)
-app.post('/api/refresh', async (req, res) => {
-  res.json({ message: 'Refresh triggered. Run `npm run fetch` in terminal.' });
+// API: search any hotel via Google Places
+app.get('/api/search', async (req, res) => {
+  const q = req.query.q?.trim();
+  if (!q || q.length < 2) return res.json([]);
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'Google API key not configured' });
+  try {
+    const r = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
+      params: { query: q, type: 'lodging', key: apiKey }
+    });
+    res.json(r.data.results.slice(0, 8).map(x => ({
+      placeId: x.place_id, name: x.name,
+      address: x.formatted_address, rating: x.rating, totalRatings: x.user_ratings_total
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: full details for one hotel by placeId
+app.get('/api/hotel', async (req, res) => {
+  const { placeId } = req.query;
+  if (!placeId) return res.status(400).json({ error: 'placeId required' });
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'Google API key not configured' });
+  try {
+    const r = await axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
+      params: {
+        place_id: placeId,
+        fields: 'name,rating,user_ratings_total,reviews,photos,website,formatted_phone_number,url,formatted_address',
+        key: apiKey
+      }
+    });
+    const d = r.data.result;
+    res.json({
+      placeId, name: d.name, address: d.formatted_address,
+      rating: d.rating, totalRatings: d.user_ratings_total,
+      googleMapsUrl: d.url, website: d.website, phone: d.formatted_phone_number,
+      reviews: (d.reviews || []).map(rv => ({
+        author: rv.author_name, rating: rv.rating, text: rv.text,
+        time: rv.time, timeDescription: rv.relative_time_description,
+        profilePhoto: rv.profile_photo_url
+      })),
+      photos: (d.photos || []).slice(0, 20).map(p => ({
+        url: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${p.photo_reference}&key=${apiKey}`,
+        width: p.width, height: p.height
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: trigger re-fetch (runs fetch-all in the background)
+app.post('/api/refresh', (req, res) => {
+  res.status(202).json({ message: 'Refresh started.' });
+  runFetch().catch(err => console.error(chalk.red('Background refresh failed:'), err));
 });
 
 app.listen(PORT, async () => {
@@ -72,11 +128,13 @@ app.listen(PORT, async () => {
   console.log(chalk.green(`  Running at: ${chalk.bold.white(url)}`));
   console.log(chalk.gray('  Press Ctrl+C to stop\n'));
 
-  // Auto-open browser
-  try {
-    await open(url);
-    console.log(chalk.gray('  Browser opened automatically'));
-  } catch {
-    console.log(chalk.gray('  Open your browser and navigate to the URL above'));
+  // Auto-open browser (only in interactive/local terminal sessions)
+  if (process.stdout.isTTY) {
+    try {
+      await open(url);
+      console.log(chalk.gray('  Browser opened automatically'));
+    } catch {
+      console.log(chalk.gray('  Open your browser and navigate to the URL above'));
+    }
   }
 });

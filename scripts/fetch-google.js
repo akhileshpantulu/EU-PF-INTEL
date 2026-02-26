@@ -29,19 +29,10 @@ if (fs.existsSync(envPath)) {
   });
 }
 
-const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+let API_KEY; // Set inside main() so this module is safe to import
 const PHOTO_MAX_WIDTH = 800;
 const MAX_PHOTOS = 60;
 const DELAY_MS = 300; // Be polite to the API
-
-if (!API_KEY || API_KEY === 'your_google_places_api_key_here') {
-  console.error(chalk.red('❌ Missing GOOGLE_PLACES_API_KEY in .env'));
-  process.exit(1);
-}
-
-const properties = JSON.parse(
-  fs.readFileSync(path.join(ROOT, 'properties.json'), 'utf8')
-);
 
 const dataDir = path.join(ROOT, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -179,6 +170,15 @@ async function fetchProperty(property) {
  * Run all properties and save results
  */
 async function main() {
+  API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+  if (!API_KEY || API_KEY === 'your_google_places_api_key_here') {
+    throw new Error('Missing GOOGLE_PLACES_API_KEY in environment');
+  }
+
+  const properties = JSON.parse(
+    fs.readFileSync(path.join(ROOT, 'properties.json'), 'utf8')
+  );
+
   console.log(chalk.bold.green('\n🗺  Google Places Fetcher'));
   console.log(chalk.gray(`  Fetching ${properties.length} properties...\n`));
 
@@ -211,7 +211,11 @@ async function main() {
   console.log(chalk.gray(`   Saved to data/google.json\n`));
 }
 
-main().catch(err => {
-  console.error(chalk.red('Fatal error:'), err);
-  process.exit(1);
-});
+export { main };
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(err => {
+    console.error(chalk.red('Fatal error:'), err);
+    process.exit(1);
+  });
+}

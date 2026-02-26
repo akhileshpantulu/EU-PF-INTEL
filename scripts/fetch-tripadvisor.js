@@ -29,29 +29,16 @@ if (fs.existsSync(envPath)) {
   });
 }
 
-const API_KEY = process.env.TRIPADVISOR_API_KEY;
+let API_KEY; // Set inside main() so this module is safe to import
 const BASE_URL = 'https://api.content.tripadvisor.com/api/v1';
 const DELAY_MS = 500;
-
-if (!API_KEY || API_KEY === 'your_tripadvisor_api_key_here') {
-  console.error(chalk.red('❌ Missing TRIPADVISOR_API_KEY in .env'));
-  process.exit(1);
-}
-
-const properties = JSON.parse(
-  fs.readFileSync(path.join(ROOT, 'properties.json'), 'utf8')
-);
 
 const dataDir = path.join(ROOT, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-const taAxios = axios.create({
-  baseURL: BASE_URL,
-  headers: { accept: 'application/json' },
-  params: { key: API_KEY },
-});
+let taAxios; // Initialized inside main() once API_KEY is known
 
 /**
  * Step 1: Search for location ID
@@ -251,6 +238,21 @@ async function fetchProperty(property) {
  * Run all properties and save results
  */
 async function main() {
+  API_KEY = process.env.TRIPADVISOR_API_KEY;
+  if (!API_KEY || API_KEY === 'your_tripadvisor_api_key_here') {
+    throw new Error('Missing TRIPADVISOR_API_KEY in environment');
+  }
+
+  taAxios = axios.create({
+    baseURL: BASE_URL,
+    headers: { accept: 'application/json' },
+    params: { key: API_KEY },
+  });
+
+  const properties = JSON.parse(
+    fs.readFileSync(path.join(ROOT, 'properties.json'), 'utf8')
+  );
+
   console.log(chalk.bold.yellow('\n🦅  TripAdvisor Content API Fetcher'));
   console.log(chalk.gray(`  Fetching ${properties.length} properties...\n`));
 
@@ -280,7 +282,11 @@ async function main() {
   console.log(chalk.gray(`   Saved to data/tripadvisor.json\n`));
 }
 
-main().catch(err => {
-  console.error(chalk.red('Fatal error:'), err);
-  process.exit(1);
-});
+export { main };
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(err => {
+    console.error(chalk.red('Fatal error:'), err);
+    process.exit(1);
+  });
+}

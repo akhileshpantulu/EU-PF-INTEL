@@ -849,10 +849,10 @@
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="filter-group">
-      <input class="search-box" id="search" type="text" placeholder="Search properties...">
+      <input class="search-box" id="search" type="text" placeholder="Search any hotel...">
     </div>
 
-    <div class="filter-group">
+    <div class="filter-group" id="sort-group">
       <select class="sort-select" id="sort-select">
         <option value="id">Sort: Property #</option>
         <option value="name">Sort: Name A–Z</option>
@@ -871,7 +871,7 @@
       </button>
     </div>
 
-    <div class="sidebar-section" style="margin-top:8px;">Properties</div>
+    <div class="sidebar-section" id="list-label" style="margin-top:8px;">Portfolio</div>
     <div class="property-list" id="property-list">
       <div class="loading"><div class="spinner"></div></div>
     </div>
@@ -1052,8 +1052,142 @@ function renderSidebar() {
   }).join('');
 }
 
-document.getElementById('search').addEventListener('input', renderSidebar);
+document.getElementById('search').addEventListener('input', onSearchInput);
 document.getElementById('sort-select').addEventListener('change', renderSidebar);
+
+// ─────────────────────────────────────────
+//  Live Hotel Search
+// ─────────────────────────────────────────
+let searchTimeout = null;
+
+function onSearchInput() {
+  const q = document.getElementById('search').value.trim();
+  if (q.length === 0) {
+    document.getElementById('sort-group').style.display = '';
+    document.getElementById('list-label').textContent = 'Portfolio';
+    renderSidebar();
+    return;
+  }
+  document.getElementById('sort-group').style.display = 'none';
+  document.getElementById('list-label').textContent = 'Search Results';
+  if (q.length < 3) {
+    document.getElementById('property-list').innerHTML =
+      '<div style="padding:16px;color:var(--text-muted);font-size:12px;text-align:center;">Keep typing…</div>';
+    return;
+  }
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => doSearch(q), 400);
+}
+
+async function doSearch(q) {
+  const list = document.getElementById('property-list');
+  list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const results = await fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json());
+    if (results.error) {
+      list.innerHTML = `<div style="padding:16px;color:var(--red);font-size:12px;">${escHtml(results.error)}</div>`;
+      return;
+    }
+    if (!results.length) {
+      list.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:12px;text-align:center;">No hotels found</div>';
+      return;
+    }
+    list.innerHTML = results.map(r => `
+      <div class="property-item" onclick="selectSearchResult('${escHtml(r.placeId)}', this)">
+        <div class="property-item-name">${escHtml(r.name)}</div>
+        <div class="property-item-meta">
+          <span class="property-item-city">${escHtml(r.address?.split(',').slice(-3,-1).join(',').trim() || '')}</span>
+          ${r.rating ? `<span class="mini-rating google"><span class="star">★</span><span class="val">${r.rating}</span></span>` : ''}
+        </div>
+      </div>`).join('');
+  } catch {
+    list.innerHTML = '<div style="padding:16px;color:var(--red);font-size:12px;">Search failed</div>';
+  }
+}
+
+async function selectSearchResult(placeId, el) {
+  document.querySelectorAll('#property-list .property-item').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  selectedId = null;
+  document.getElementById('view-welcome').style.display = 'none';
+  document.getElementById('view-portfolio').style.display = 'none';
+  document.getElementById('view-overview').style.display = 'block';
+  document.getElementById('overview-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const hotel = await fetch(`/api/hotel?placeId=${encodeURIComponent(placeId)}`).then(r => r.json());
+    if (hotel.error) throw new Error(hotel.error);
+    renderSearchOverview(hotel);
+  } catch (err) {
+    document.getElementById('overview-content').innerHTML =
+      `<div style="padding:32px;color:var(--red);">Failed to load: ${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderSearchOverview(hotel) {
+  const photos = hotel.photos || [];
+  lightboxPhotos = photos;
+  document.getElementById('overview-content').innerHTML = `
+    <div class="property-header" style="margin-bottom:20px;">
+      <div class="property-title-row">
+        <div>
+          <div style="margin-bottom:8px;"><span class="brand-tag">Search Result</span></div>
+          <div class="property-title">${escHtml(hotel.name)}</div>
+          <div class="property-location"><span>📍</span><span>${escHtml(hotel.address || '')}</span></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          ${hotel.googleMapsUrl ? `<a href="${hotel.googleMapsUrl}" target="_blank" style="padding:7px 14px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);color:var(--google-green);border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-decoration:none;">Google Maps ↗</a>` : ''}
+        </div>
+      </div>
+      <div class="ratings-grid">
+        <div class="rating-block">
+          <div class="rating-source google">Google Reviews</div>
+          <div class="rating-main">
+            <span class="rating-number google">${hotel.rating || '—'}</span>
+            <span class="rating-max">/ 5</span>
+          </div>
+          <div class="stars-row">${starsHtml(hotel.rating || 0)}</div>
+          <div class="rating-count">${(hotel.totalRatings || 0).toLocaleString()} reviews</div>
+        </div>
+      </div>
+    </div>
+    <div class="tabs" style="margin-bottom:20px;">
+      <div class="tab active" id="tab-reviews" onclick="switchTab('reviews')">Reviews</div>
+      <div class="tab" id="tab-photos" onclick="switchTab('photos')">
+        Photos ${photos.length > 0 ? `<span style="opacity:0.6;font-size:11px;">(${photos.length})</span>` : ''}
+      </div>
+    </div>
+    <div class="tab-content active" id="tab-content-reviews">
+      ${renderSearchReviews(hotel.reviews || [])}
+    </div>
+    <div class="tab-content" id="tab-content-photos">
+      ${renderPhotos(photos)}
+    </div>`;
+}
+
+function renderSearchReviews(reviews) {
+  if (!reviews.length) return `<div class="no-data"><div class="no-data-icon">💬</div><div class="no-data-text">No reviews available</div></div>`;
+  return reviews.map(r => `
+    <div class="review-card">
+      <div class="review-header">
+        <div class="reviewer-info">
+          <div class="reviewer-avatar">
+            ${r.profilePhoto ? `<img src="${r.profilePhoto}" onerror="this.parentNode.textContent='👤'" alt="">` : '👤'}
+          </div>
+          <div>
+            <div class="reviewer-name">${escHtml(r.author)}</div>
+            <div class="review-rating-stars">
+              ${Array.from({length:5},(_,i)=>`<span class="review-star ${i<r.rating?'':'empty'}">★</span>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="review-date">${r.timeDescription || ''}</div>
+          <div style="margin-top:3px;"><span class="badge badge-google" style="font-size:9px;padding:2px 6px;">Google</span></div>
+        </div>
+      </div>
+      <div class="review-text">${escHtml(r.text || '')}</div>
+    </div>`).join('');
+}
 
 // ─────────────────────────────────────────
 //  Views
