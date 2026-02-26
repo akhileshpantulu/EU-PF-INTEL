@@ -113,6 +113,9 @@
 
     .badge-google { background: rgba(74, 222, 128, 0.1); color: var(--google-green); border: 1px solid rgba(74, 222, 128, 0.2); }
     .badge-ta { background: rgba(52, 211, 153, 0.1); color: var(--ta-green); border: 1px solid rgba(52, 211, 153, 0.2); }
+    .header-refresh-btn { padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 20px; font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+    .header-refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .header-refresh-btn:disabled { opacity: 0.5; cursor: default; }
 
     /* ─── LAYOUT ─── */
     .layout {
@@ -913,6 +916,7 @@
   </div>
   <div class="header-right">
     <span class="last-fetch" id="last-fetch">Loading...</span>
+    <button class="header-refresh-btn" id="header-refresh-btn" onclick="refreshAllData()">↻ Refresh Data</button>
     <span class="badge badge-google" id="google-badge">Google</span>
     <span class="badge badge-ta" id="ta-badge">TripAdvisor</span>
   </div>
@@ -1054,10 +1058,16 @@ async function init() {
         `TripAdvisor ${meta.taSuccess}/${meta.propertyCount}`;
     }
 
-    // TripAdvisor key diagnostic
+    // TripAdvisor key / data diagnostic
     if (status.tripadvisor === false) {
       const taBadge = document.getElementById('ta-badge');
       taBadge.textContent = 'TripAdvisor: key missing';
+      taBadge.style.background = 'rgba(251,146,60,0.1)';
+      taBadge.style.color = '#fb923c';
+      taBadge.style.borderColor = 'rgba(251,146,60,0.3)';
+    } else if (meta.taSuccess === 0) {
+      const taBadge = document.getElementById('ta-badge');
+      taBadge.textContent = 'TripAdvisor: no data — click Refresh';
       taBadge.style.background = 'rgba(251,146,60,0.1)';
       taBadge.style.color = '#fb923c';
       taBadge.style.borderColor = 'rgba(251,146,60,0.3)';
@@ -1080,6 +1090,39 @@ async function init() {
     console.error('Failed to load data:', err);
     loadFolders();
     showWelcome();
+  }
+}
+
+// ─────────────────────────────────────────
+//  Global Data Refresh
+// ─────────────────────────────────────────
+async function refreshAllData() {
+  const btn = document.getElementById('header-refresh-btn');
+  btn.disabled = true;
+  btn.textContent = '↻ Refreshing…';
+  try {
+    // Capture current lastFetch before triggering refresh
+    const before = await fetch('/api/metadata').then(r => r.json()).catch(() => ({}));
+    await fetch('/api/refresh', { method: 'POST' });
+    // Poll metadata every 5 s until lastFetch changes (refresh complete)
+    const poll = setInterval(async () => {
+      const after = await fetch('/api/metadata').then(r => r.json()).catch(() => ({}));
+      if (after.lastFetch && after.lastFetch !== before.lastFetch) {
+        clearInterval(poll);
+        btn.textContent = '↻ Done — reloading…';
+        setTimeout(() => location.reload(), 800);
+      }
+    }, 5000);
+    // Give up after 3 minutes and let user reload manually
+    setTimeout(() => {
+      clearInterval(poll);
+      btn.disabled = false;
+      btn.textContent = '↻ Refresh Data';
+    }, 180000);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = '↻ Refresh Data';
+    alert('Refresh failed: ' + err.message);
   }
 }
 
