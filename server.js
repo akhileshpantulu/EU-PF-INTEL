@@ -290,6 +290,8 @@ app.get('/api/folders', (req, res) => {
       placeId: h.placeId, name: h.name, address: h.address,
       rating: h.rating, totalRatings: h.totalRatings,
       numRooms: h.numRooms ?? null,
+      taRating: h.cachedData?.tripadvisor?.rating ?? null,
+      taNumReviews: h.cachedData?.tripadvisor?.numReviews ?? null,
       savedAt: h.savedAt, lastFetched: h.lastFetched,
       lat: h.lat, lng: h.lng
     }))

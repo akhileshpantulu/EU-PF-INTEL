@@ -1455,16 +1455,28 @@ function selectFolder(folderId) {
 
 function renderFolderOverview(folder) {
   const hotels = folder.hotels;
-  const rated = hotels.filter(h => h.rating);
-  const top5 = [...rated].sort((a, b) => b.rating - a.rating).slice(0, 5);
-  const bot5 = [...rated].sort((a, b) => a.rating - b.rating).slice(0, 5);
+  const withScore = hotels.map(h => {
+    const g  = h.rating       ? parseFloat(h.rating)     : null;
+    const gN = h.totalRatings ? parseInt(h.totalRatings) : 0;
+    const ta = h.taRating     ? parseFloat(h.taRating)   : null;
+    const tN = h.taNumReviews ? parseInt(h.taNumReviews) : 0;
+    let score = null;
+    if (g !== null && ta !== null && (gN + tN) > 0) {
+      score = (g * gN + ta * tN) / (gN + tN);
+    } else {
+      score = g ?? ta;
+    }
+    return { ...h, _score: score };
+  }).filter(h => h._score != null);
+  const top5 = [...withScore].sort((a, b) => b._score - a._score).slice(0, 5);
+  const bot5 = [...withScore].sort((a, b) => a._score - b._score).slice(0, 5);
   const hasMap = hotels.some(h => h.lat && h.lng);
 
   const rankRow = (h, i, scoreColor) => `
     <div class="ranking-row" onclick="selectSavedHotel('${escHtml(folder.id)}','${escHtml(h.placeId)}')">
       <span class="ranking-pos">${i + 1}</span>
       <span class="ranking-name" title="${escHtml(h.name)}">${escHtml(h.name)}</span>
-      <span class="ranking-score" style="color:${scoreColor};">★ ${h.rating}</span>
+      <span class="ranking-score" style="color:${scoreColor};">★ ${h._score.toFixed(1)}</span>
     </div>`;
 
   document.getElementById('folder-overview-content').innerHTML = `
@@ -1476,11 +1488,11 @@ function renderFolderOverview(folder) {
       ? `<div style="padding:48px;text-align:center;color:var(--text-muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">No hotels saved yet — search for a hotel and save it to this folder.</div>`
       : `<div class="top-bottom-grid">
           <div class="ranking-card">
-            <div class="ranking-card-title">⬆ Top ${top5.length} by Rating</div>
+            <div class="ranking-card-title">⬆ Top ${top5.length} by Avg Rating</div>
             ${top5.map((h, i) => rankRow(h, i, 'var(--google-green)')).join('')}
           </div>
           <div class="ranking-card">
-            <div class="ranking-card-title">⬇ Bottom ${bot5.length} by Rating</div>
+            <div class="ranking-card-title">⬇ Bottom ${bot5.length} by Avg Rating</div>
             ${bot5.map((h, i) => rankRow(h, i, 'var(--red)')).join('')}
           </div>
         </div>
