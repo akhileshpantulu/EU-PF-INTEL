@@ -435,12 +435,12 @@ app.get('/api/test-claude', async (req, res) => {
   }
   try {
     const response = await claude.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: 64,
       messages: [{ role: 'user', content: 'You are a hotel industry database. What is the exact total number of guest rooms (keys) at "JW Marriott Houston" located at "806 Main St, Houston, TX"? Think carefully — recall the specific property, not a similar-named one. Reply with ONLY a single integer (e.g. 316). If you cannot find this specific property with confidence, reply with the single word null.' }]
     });
     const raw = response.content[0]?.text?.trim() || '';
-    res.json({ keyPresent: true, raw, parsed: parseInt(raw) || null });
+    res.json({ keyPresent: true, model: 'claude-sonnet-4-6', raw, parsed: parseInt(raw) || null });
   } catch (err) {
     res.json({ keyPresent: true, error: err.message });
   }
