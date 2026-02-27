@@ -164,7 +164,7 @@ async function lookupRoomsViaClaude(name, address) {
     console.log('[Claude] No API key configured — skipping room lookup');
     return null;
   }
-  const prompt = `You are a hotel industry expert database. How many total guest rooms does "${name}" at "${address}" have? Think carefully and recall this specific property. Reply with ONLY the integer room count (e.g. 316). If you genuinely have no data for this exact property, reply with 0.`;
+  const prompt = `You are a hotel industry expert database. How many total guest rooms does "${name}" at "${address}" have? Think carefully and recall this specific property. Reply with ONLY a single integer — the room count, nothing else (e.g. 316). If you have no reliable data for this exact property, reply with the single word: null`;
   try {
     const res = await claude.messages.create({
       model: 'claude-sonnet-4-6',
@@ -175,10 +175,20 @@ async function lookupRoomsViaClaude(name, address) {
     const textBlock = res.content.find(b => b.type === 'text');
     const raw = textBlock?.text?.trim() || '';
     console.log(`[Claude] room count for "${name}": "${raw}"`);
-    // Extract first integer anywhere in the response (handles "about 301", "301 rooms", etc.)
-    const match = raw.match(/\b(\d+)\b/);
-    const n = match ? parseInt(match[1]) : null;
-    return n && n > 5 && n < 20000 ? n : null;
+
+    // 1. Claude followed instructions exactly — starts with (or is) a bare integer
+    const direct = parseInt(raw);
+    if (Number.isFinite(direct) && direct > 5 && direct < 20000) return direct;
+
+    // 2. Claude added surrounding text — look for number next to a rooms/keys keyword
+    const ctxMatch = raw.match(/(\d+)\s*(?:guest\s*)?(?:rooms?|keys?|suites?)/i)
+                  || raw.match(/(?:has|have|with|total(?:\s+of)?|approximately|about|around|roughly)\s+(\d+)/i);
+    if (ctxMatch) {
+      const cn = parseInt(ctxMatch[1]);
+      if (Number.isFinite(cn) && cn > 5 && cn < 20000) return cn;
+    }
+
+    return null; // genuinely unknown
   } catch (err) {
     console.error('[Claude] room lookup error:', err.message);
     return null;
