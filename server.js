@@ -486,12 +486,16 @@ app.get('/api/rooms-lookup', async (req, res) => {
       }
 
       // Strategy B: text search + name match (fallback for hotels not near coordinates).
+      // Threshold is 1.0 (all target-name words must appear in the candidate) to avoid
+      // same-brand different-location false positives, e.g. "Moxy Paris Bastille"
+      // scoring 0.67 against a search for "Moxy Paris La Villette".  If no exact match
+      // is found here the cascade falls through to Strategy C (Google / SerpAPI).
       if (!match) {
         const q = address ? `${name} ${address}` : name;
         match = await taBestMatch(
           taClient,
           { ...baseParams, searchQuery: q },
-          name, 0.33
+          name, 1.0
         );
         if (match) console.log(`[rooms-lookup] text match: ${match.location_id} "${match.name}" (score ${match._score.toFixed(2)})`);
       }
