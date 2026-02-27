@@ -429,10 +429,10 @@ app.patch('/api/folders/:folderId/hotels/:placeId/rooms', (req, res) => {
 
 // GET /api/rooms-lookup?name=...&address=... — SerpAPI-powered room count lookup
 app.get('/api/rooms-lookup', async (req, res) => {
-  const { name, address } = req.query;
+  const { name, address, lat, lng } = req.query;
   if (!name) return res.status(400).json({ error: 'name required' });
   try {
-    // Step 1: resolve TripAdvisor location ID from hotel name + address
+    // Step 1: resolve TripAdvisor location ID — use lat/lng when available for precision
     const taKey = process.env.TRIPADVISOR_API_KEY;
     let taLocationId = null;
     if (taKey) {
@@ -441,11 +441,17 @@ app.get('/api/rooms-lookup', async (req, res) => {
         headers: { accept: 'application/json' },
         params: { key: taKey },
       });
-      // Include address in searchQuery so TA returns the geographically correct property
-      const searchQuery = address ? `${name} ${address}` : name;
-      const r = await taClient.get('/location/search', {
-        params: { searchQuery, category: 'hotels', language: 'en' },
-      });
+      const taParams = { searchQuery: name, category: 'hotels', language: 'en' };
+      if (lat && lng) {
+        // Geo-anchor to within 1 km of the known coordinates so chain hotels
+        // (e.g. multiple Moxy properties) resolve to the correct specific property
+        taParams.latLong = `${lat},${lng}`;
+        taParams.radius = 1;
+        taParams.radiusUnit = 'km';
+      } else if (address) {
+        taParams.searchQuery = `${name} ${address}`;
+      }
+      const r = await taClient.get('/location/search', { params: taParams });
       taLocationId = r.data?.data?.[0]?.location_id || null;
     }
     // Step 2: look up room count via SerpAPI
