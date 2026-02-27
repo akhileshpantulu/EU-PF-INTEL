@@ -166,14 +166,10 @@ async function lookupRoomsViaSerpApi(locationId) {
   }
   try {
     const { data } = await axios.get('https://serpapi.com/search.json', {
-      params: { engine: 'tripadvisor', location_id: locationId, api_key: apiKey },
+      params: { engine: 'tripadvisor_place', place_id: locationId, api_key: apiKey },
       timeout: 10000,
     });
-    // num_rooms may appear at different depths in the SerpAPI TripAdvisor response
-    const n = data.num_rooms
-           ?? data.overview?.num_rooms
-           ?? data.overview?.about?.num_rooms
-           ?? null;
+    const n = data.place_result?.num_rooms ?? null;
     console.log(`[SerpAPI] room count for TA location ${locationId}: ${n}`);
     return Number.isFinite(n) && n > 0 ? n : null;
   } catch (err) {
