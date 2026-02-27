@@ -168,10 +168,12 @@ async function lookupRoomsViaClaude(name, address) {
   try {
     const res = await claude.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 64,
+      max_tokens: 4096,
+      thinking: { type: 'enabled', budget_tokens: 2048 },
       messages: [{ role: 'user', content: prompt }]
     });
-    const raw = res.content[0]?.text?.trim() || '';
+    const textBlock = res.content.find(b => b.type === 'text');
+    const raw = textBlock?.text?.trim() || '';
     console.log(`[Claude] room count for "${name}": "${raw}"`);
     const n = parseInt(raw);
     return Number.isFinite(n) && n > 0 ? n : null;
@@ -436,11 +438,13 @@ app.get('/api/test-claude', async (req, res) => {
   try {
     const response = await claude.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 64,
+      max_tokens: 4096,
+      thinking: { type: 'enabled', budget_tokens: 2048 },
       messages: [{ role: 'user', content: 'You are a hotel industry database. What is the exact total number of guest rooms (keys) at "JW Marriott Houston" located at "806 Main St, Houston, TX"? Think carefully — recall the specific property, not a similar-named one. Reply with ONLY a single integer (e.g. 316). If you cannot find this specific property with confidence, reply with the single word null.' }]
     });
-    const raw = response.content[0]?.text?.trim() || '';
-    res.json({ keyPresent: true, model: 'claude-sonnet-4-6', raw, parsed: parseInt(raw) || null });
+    const textBlock = response.content.find(b => b.type === 'text');
+    const raw = textBlock?.text?.trim() || '';
+    res.json({ keyPresent: true, model: 'claude-sonnet-4-6 (extended thinking)', raw, parsed: parseInt(raw) || null });
   } catch (err) {
     res.json({ keyPresent: true, error: err.message });
   }
