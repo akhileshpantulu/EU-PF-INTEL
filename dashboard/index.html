@@ -2335,10 +2335,13 @@ async function fetchAndDisplayRooms(name, address, folderId, placeId) {
         }).catch(() => {});
       }
     } else {
-      document.getElementById('rooms-gem')?.remove();
+      el.textContent = 'rooms: ?';
+      el.style.fontStyle = 'normal';
+      el.style.opacity = '0.45';
     }
   } catch {
-    document.getElementById('rooms-gem')?.remove();
+    const el2 = document.getElementById('rooms-gem-val');
+    if (el2) { el2.textContent = 'rooms: ?'; el2.style.opacity = '0.45'; }
   }
 }
 

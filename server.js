@@ -164,7 +164,7 @@ async function lookupRoomsViaClaude(name, address) {
     console.log('[Claude] No API key configured — skipping room lookup');
     return null;
   }
-  const prompt = `You are a hotel industry database. What is the exact total number of guest rooms (keys) at "${name}" located at "${address}"? Think carefully — recall the specific property, not a similar-named one. Reply with ONLY a single integer (e.g. 316). If you cannot find this specific property with confidence, reply with the single word null.`;
+  const prompt = `You are a hotel industry expert database. How many total guest rooms does "${name}" at "${address}" have? Think carefully and recall this specific property. Reply with ONLY the integer room count (e.g. 316). If you genuinely have no data for this exact property, reply with 0.`;
   try {
     const res = await claude.messages.create({
       model: 'claude-sonnet-4-6',
@@ -175,8 +175,10 @@ async function lookupRoomsViaClaude(name, address) {
     const textBlock = res.content.find(b => b.type === 'text');
     const raw = textBlock?.text?.trim() || '';
     console.log(`[Claude] room count for "${name}": "${raw}"`);
-    const n = parseInt(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
+    // Extract first integer anywhere in the response (handles "about 301", "301 rooms", etc.)
+    const match = raw.match(/\b(\d+)\b/);
+    const n = match ? parseInt(match[1]) : null;
+    return n && n > 5 && n < 20000 ? n : null;
   } catch (err) {
     console.error('[Claude] room lookup error:', err.message);
     return null;
