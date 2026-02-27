@@ -158,39 +158,26 @@ async function fetchTAHotelDetails(locationId) {
   }
 }
 
-async function lookupRoomsViaClaude(name, address) {
-  const claude = getClaudeClient();
-  if (!claude) {
-    console.log('[Claude] No API key configured — skipping room lookup');
+async function lookupRoomsViaSerpApi(locationId) {
+  const apiKey = process.env.SERPAPI_KEY;
+  if (!apiKey || apiKey === 'your_serpapi_key_here') {
+    console.log('[SerpAPI] No API key configured — skipping room lookup');
     return null;
   }
-  const prompt = `You are a hotel industry expert database. How many total guest rooms does "${name}" at "${address}" have? Think carefully and recall this specific property. Reply with ONLY a single integer — the room count, nothing else (e.g. 316). If you have no reliable data for this exact property, reply with the single word: null`;
   try {
-    const res = await claude.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      thinking: { type: 'enabled', budget_tokens: 2048 },
-      messages: [{ role: 'user', content: prompt }]
+    const { data } = await axios.get('https://serpapi.com/search.json', {
+      params: { engine: 'tripadvisor', location_id: locationId, api_key: apiKey },
+      timeout: 10000,
     });
-    const textBlock = res.content.find(b => b.type === 'text');
-    const raw = textBlock?.text?.trim() || '';
-    console.log(`[Claude] room count for "${name}": "${raw}"`);
-
-    // 1. Claude followed instructions exactly — starts with (or is) a bare integer
-    const direct = parseInt(raw);
-    if (Number.isFinite(direct) && direct > 5 && direct < 20000) return direct;
-
-    // 2. Claude added surrounding text — look for number next to a rooms/keys keyword
-    const ctxMatch = raw.match(/(\d+)\s*(?:guest\s*)?(?:rooms?|keys?|suites?)/i)
-                  || raw.match(/(?:has|have|with|total(?:\s+of)?|approximately|about|around|roughly)\s+(\d+)/i);
-    if (ctxMatch) {
-      const cn = parseInt(ctxMatch[1]);
-      if (Number.isFinite(cn) && cn > 5 && cn < 20000) return cn;
-    }
-
-    return null; // genuinely unknown
+    // num_rooms may appear at different depths in the SerpAPI TripAdvisor response
+    const n = data.num_rooms
+           ?? data.overview?.num_rooms
+           ?? data.overview?.about?.num_rooms
+           ?? null;
+    console.log(`[SerpAPI] room count for TA location ${locationId}: ${n}`);
+    return Number.isFinite(n) && n > 0 ? n : null;
   } catch (err) {
-    console.error('[Claude] room lookup error:', err.message);
+    console.error('[SerpAPI] room lookup error:', err.message);
     return null;
   }
 }
@@ -357,17 +344,17 @@ app.post('/api/folders/:id/hotels', async (req, res) => {
     return res.status(409).json({ error: 'Hotel already in folder' });
   }
   try {
-    const [full, taFull, claudeRooms] = await Promise.all([
+    const [full, taFull, serpRooms] = await Promise.all([
       fetchHotelDetails(placeId),
       taLocationId ? fetchTAHotelDetails(taLocationId).catch(() => null) : Promise.resolve(null),
-      lookupRoomsViaClaude(name || '', address || '').catch(() => null),
+      taLocationId ? lookupRoomsViaSerpApi(taLocationId).catch(() => null) : Promise.resolve(null),
     ]);
     const now = new Date().toISOString();
     const hotel = {
       placeId, name: full.name || name, address: full.address || address,
       rating: full.rating ?? rating, totalRatings: full.totalRatings ?? totalRatings,
       lat: full.lat, lng: full.lng,
-      numRooms: claudeRooms || null,
+      numRooms: serpRooms || null,
       savedAt: now, lastFetched: now,
       cachedData: { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos, tripadvisor: taFull }
     };
@@ -401,16 +388,16 @@ app.post('/api/folders/:folderId/hotels/:placeId/refresh', async (req, res) => {
   if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
   try {
     const taLocationId = hotel.cachedData?.tripadvisor?.locationId;
-    const [full, taFull, claudeRooms] = await Promise.all([
+    const [full, taFull, serpRooms] = await Promise.all([
       fetchHotelDetails(req.params.placeId),
       taLocationId ? fetchTAHotelDetails(taLocationId).catch(() => null) : Promise.resolve(null),
-      hotel.numRooms ? Promise.resolve(hotel.numRooms) : lookupRoomsViaClaude(hotel.name, hotel.address).catch(() => null),
+      taLocationId ? lookupRoomsViaSerpApi(taLocationId).catch(() => null) : Promise.resolve(null),
     ]);
     hotel.rating = full.rating;
     hotel.totalRatings = full.totalRatings;
     hotel.lat = full.lat;
     hotel.lng = full.lng;
-    if (claudeRooms) hotel.numRooms = claudeRooms;
+    if (serpRooms) hotel.numRooms = serpRooms;
     hotel.lastFetched = new Date().toISOString();
     hotel.cachedData = { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos, tripadvisor: taFull || hotel.cachedData?.tripadvisor };
     savePortfolios(data);
@@ -444,15 +431,15 @@ app.patch('/api/folders/:folderId/hotels/:placeId/rooms', (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/rooms-lookup?name=...&address=... — Claude-powered room count lookup
+// GET /api/rooms-lookup?taLocationId=... — SerpAPI-powered room count lookup
 app.get('/api/rooms-lookup', async (req, res) => {
-  const { name, address } = req.query;
-  if (!name) return res.status(400).json({ error: 'name required' });
+  const { taLocationId } = req.query;
+  if (!taLocationId) return res.status(400).json({ error: 'taLocationId required' });
   try {
-    const numRooms = await lookupRoomsViaClaude(name, address || '');
+    const numRooms = await lookupRoomsViaSerpApi(taLocationId);
     res.json({ numRooms });
   } catch (err) {
-    console.error('[Claude] rooms-lookup error:', err.response?.data || err.message);
+    console.error('[SerpAPI] rooms-lookup error:', err.response?.data || err.message);
     res.json({ numRooms: null }); // fail gracefully — never block the UI
   }
 });
