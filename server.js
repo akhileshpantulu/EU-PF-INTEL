@@ -343,7 +343,7 @@ app.post('/api/folders/:id/hotels', async (req, res) => {
     return res.status(409).json({ error: 'Hotel already in folder' });
   }
   try {
-    const [full, taFull, gemRooms] = await Promise.all([
+    const [full, taFull, claudeRooms] = await Promise.all([
       fetchHotelDetails(placeId),
       taLocationId ? fetchTAHotelDetails(taLocationId).catch(() => null) : Promise.resolve(null),
       lookupRoomsViaClaude(name || '', address || '').catch(() => null),
@@ -353,7 +353,7 @@ app.post('/api/folders/:id/hotels', async (req, res) => {
       placeId, name: full.name || name, address: full.address || address,
       rating: full.rating ?? rating, totalRatings: full.totalRatings ?? totalRatings,
       lat: full.lat, lng: full.lng,
-      numRooms: gemRooms,
+      numRooms: taFull?.numRooms || claudeRooms || null,
       savedAt: now, lastFetched: now,
       cachedData: { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos, tripadvisor: taFull }
     };
@@ -395,6 +395,7 @@ app.post('/api/folders/:folderId/hotels/:placeId/refresh', async (req, res) => {
     hotel.totalRatings = full.totalRatings;
     hotel.lat = full.lat;
     hotel.lng = full.lng;
+    if (!hotel.numRooms && taFull?.numRooms) hotel.numRooms = taFull.numRooms;
     hotel.lastFetched = new Date().toISOString();
     hotel.cachedData = { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos, tripadvisor: taFull || hotel.cachedData?.tripadvisor };
     savePortfolios(data);
@@ -414,7 +415,7 @@ app.get('/api/folders/:folderId/hotels/:placeId', (req, res) => {
   res.json({ ...hotel, folderId: folder.id, folderName: folder.name });
 });
 
-// GET /api/rooms-lookup?name=...&address=... — Gemini-powered room count lookup
+// GET /api/rooms-lookup?name=...&address=... — Claude-powered room count lookup
 app.get('/api/rooms-lookup', async (req, res) => {
   const { name, address } = req.query;
   if (!name) return res.status(400).json({ error: 'name required' });
@@ -422,7 +423,7 @@ app.get('/api/rooms-lookup', async (req, res) => {
     const numRooms = await lookupRoomsViaClaude(name, address || '');
     res.json({ numRooms });
   } catch (err) {
-    console.error('[Gemini] rooms-lookup error:', err.response?.data || err.message);
+    console.error('[Claude] rooms-lookup error:', err.response?.data || err.message);
     res.json({ numRooms: null }); // fail gracefully — never block the UI
   }
 });
