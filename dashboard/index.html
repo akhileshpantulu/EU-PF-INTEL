@@ -1328,7 +1328,7 @@ async function selectSavedHotel(folderId, placeId) {
     const hotel = await fetch(`/api/folders/${encodeURIComponent(folderId)}/hotels/${encodeURIComponent(placeId)}`).then(r => r.json());
     if (hotel.error) throw new Error(hotel.error);
     renderSavedHotelOverview(hotel);
-    if (!hotel.numRooms) fetchAndDisplayRooms(hotel.name, hotel.address, hotel.folderId, hotel.placeId);
+    if (!hotel.numRooms) fetchAndDisplayRooms(hotel.name, hotel.address, hotel.folderId, hotel.placeId, hotel.lat, hotel.lng);
     const _savedCached = hotel.cachedData?.reviewAnalysis || _reviewCache.get(hotel.placeId) || null;
     _reviewCtx = {
       name: hotel.name,
@@ -1708,7 +1708,7 @@ async function selectSearchResult(placeId, el, name) {
       taError = taResults?.error || 'TripAdvisor search failed';
     }
     renderSearchOverview(hotel, taData, taError);
-    fetchAndDisplayRooms(hotel.name, hotel.address);
+    fetchAndDisplayRooms(hotel.name, hotel.address, null, null, hotel.lat, hotel.lng);
     const _searchCached = _reviewCache.get(hotel.place_id) || null;
     _reviewCtx = {
       name: hotel.name,
@@ -2316,9 +2316,12 @@ document.addEventListener('keydown', e => {
 // ─────────────────────────────────────────
 //  Claude Room Count
 // ─────────────────────────────────────────
-async function fetchAndDisplayRooms(name, address, folderId, placeId) {
+async function fetchAndDisplayRooms(name, address, folderId, placeId, lat, lng) {
   try {
-    const r = await fetch(`/api/rooms-lookup?${new URLSearchParams({ name: name || '', address: address || '' })}`);
+    const params = { name: name || '', address: address || '' };
+    if (lat != null) params.lat = lat;
+    if (lng != null) params.lng = lng;
+    const r = await fetch(`/api/rooms-lookup?${new URLSearchParams(params)}`);
     if (!r.ok) return;
     const { numRooms, taLocationId } = await r.json();
     const el = document.getElementById('rooms-gem-val');
@@ -2344,6 +2347,26 @@ async function fetchAndDisplayRooms(name, address, folderId, placeId) {
       el.textContent = 'rooms: ?';
       el.style.fontStyle = 'normal';
       el.style.opacity = '0.45';
+    }
+    // Update photos with the geo-anchored TA location so images match the correct hotel.
+    // The initial TA search uses name-only text matching and may have resolved a different
+    // property (e.g. wrong Moxy). rooms-lookup is now the authoritative source.
+    if (taLocationId) {
+      try {
+        const taFresh = await fetch(`/api/ta-hotel?locationId=${encodeURIComponent(taLocationId)}`).then(r => r.ok ? r.json() : null);
+        if (taFresh && !taFresh.error) {
+          const freshTaPhotos = (taFresh.photos || []).map(ph => ({
+            url: ph.images?.large || ph.images?.medium || ph.images?.small || ph.images?.original,
+            source: 'ta', caption: ph.caption,
+          }));
+          // Replace any TA photos already shown with the geo-correct set (keep Google photos)
+          lightboxPhotos = [...lightboxPhotos.filter(p => p.source !== 'ta'), ...freshTaPhotos];
+          const photoContent = document.getElementById('tab-content-photos');
+          if (photoContent) photoContent.innerHTML = renderPhotos(lightboxPhotos);
+          const photoTab = document.getElementById('tab-photos');
+          if (photoTab) photoTab.innerHTML = `Photos${lightboxPhotos.length > 0 ? ` <span style="opacity:0.6;font-size:11px;">(${lightboxPhotos.length})</span>` : ''}`;
+        }
+      } catch { /* fail silently — photos already displaying */ }
     }
   } catch {
     const el2 = document.getElementById('rooms-gem-val');
