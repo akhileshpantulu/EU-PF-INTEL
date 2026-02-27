@@ -443,16 +443,17 @@ app.get('/api/rooms-lookup', async (req, res) => {
       });
       const taParams = { searchQuery: name, category: 'hotels', language: 'en' };
       if (lat && lng) {
-        // Geo-anchor to within 1 km of the known coordinates so chain hotels
-        // (e.g. multiple Moxy properties) resolve to the correct specific property
         taParams.latLong = `${lat},${lng}`;
         taParams.radius = 1;
         taParams.radiusUnit = 'km';
       } else if (address) {
         taParams.searchQuery = `${name} ${address}`;
       }
+      console.log('[rooms-lookup] TA search params:', JSON.stringify(taParams));
       const r = await taClient.get('/location/search', { params: taParams });
-      taLocationId = r.data?.data?.[0]?.location_id || null;
+      const taResults = r.data?.data || [];
+      console.log('[rooms-lookup] TA candidates:', taResults.map(x => `${x.location_id} "${x.name}" ${x.address_obj?.address_string || ''}`));
+      taLocationId = taResults[0]?.location_id || null;
     }
     // Step 2: look up room count via SerpAPI
     const numRooms = taLocationId ? await lookupRoomsViaSerpApi(taLocationId) : null;
