@@ -429,10 +429,10 @@ app.patch('/api/folders/:folderId/hotels/:placeId/rooms', (req, res) => {
 
 // GET /api/rooms-lookup?name=...&address=... — SerpAPI-powered room count lookup
 app.get('/api/rooms-lookup', async (req, res) => {
-  const { name } = req.query;
+  const { name, address } = req.query;
   if (!name) return res.status(400).json({ error: 'name required' });
   try {
-    // Step 1: resolve TripAdvisor location ID from hotel name
+    // Step 1: resolve TripAdvisor location ID from hotel name + address
     const taKey = process.env.TRIPADVISOR_API_KEY;
     let taLocationId = null;
     if (taKey) {
@@ -441,8 +441,10 @@ app.get('/api/rooms-lookup', async (req, res) => {
         headers: { accept: 'application/json' },
         params: { key: taKey },
       });
+      // Include address in searchQuery so TA returns the geographically correct property
+      const searchQuery = address ? `${name} ${address}` : name;
       const r = await taClient.get('/location/search', {
-        params: { searchQuery: name, category: 'hotels', language: 'en' },
+        params: { searchQuery, category: 'hotels', language: 'en' },
       });
       taLocationId = r.data?.data?.[0]?.location_id || null;
     }
