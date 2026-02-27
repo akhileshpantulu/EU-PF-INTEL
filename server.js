@@ -427,15 +427,30 @@ app.patch('/api/folders/:folderId/hotels/:placeId/rooms', (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/rooms-lookup?taLocationId=... — SerpAPI-powered room count lookup
+// GET /api/rooms-lookup?name=...&address=... — SerpAPI-powered room count lookup
 app.get('/api/rooms-lookup', async (req, res) => {
-  const { taLocationId } = req.query;
-  if (!taLocationId) return res.status(400).json({ error: 'taLocationId required' });
+  const { name } = req.query;
+  if (!name) return res.status(400).json({ error: 'name required' });
   try {
-    const numRooms = await lookupRoomsViaSerpApi(taLocationId);
+    // Step 1: resolve TripAdvisor location ID from hotel name
+    const taKey = process.env.TRIPADVISOR_API_KEY;
+    let taLocationId = null;
+    if (taKey) {
+      const taClient = axios.create({
+        baseURL: 'https://api.content.tripadvisor.com/api/v1',
+        headers: { accept: 'application/json' },
+        params: { key: taKey },
+      });
+      const r = await taClient.get('/location/search', {
+        params: { searchQuery: name, category: 'hotels', language: 'en' },
+      });
+      taLocationId = r.data?.data?.[0]?.location_id || null;
+    }
+    // Step 2: look up room count via SerpAPI
+    const numRooms = taLocationId ? await lookupRoomsViaSerpApi(taLocationId) : null;
     res.json({ numRooms });
   } catch (err) {
-    console.error('[SerpAPI] rooms-lookup error:', err.response?.data || err.message);
+    console.error('[rooms-lookup] error:', err.response?.data || err.message);
     res.json({ numRooms: null }); // fail gracefully — never block the UI
   }
 });
