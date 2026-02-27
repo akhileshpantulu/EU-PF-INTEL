@@ -440,6 +440,37 @@ app.get('/api/rooms-lookup', async (req, res) => {
   }
 });
 
+// GET /api/test-serpapi — diagnostic: make a real SerpAPI tripadvisor_place call and return raw response
+app.get('/api/test-serpapi', async (req, res) => {
+  const apiKey = process.env.SERPAPI_KEY;
+  if (!apiKey || apiKey === 'your_serpapi_key_here') {
+    return res.json({ error: 'SERPAPI_KEY not set or still placeholder', keyPresent: false });
+  }
+  const testPlaceId = '23581709';
+  try {
+    const { data } = await axios.get('https://serpapi.com/search.json', {
+      params: { engine: 'tripadvisor_place', place_id: testPlaceId, api_key: apiKey },
+      timeout: 10000,
+    });
+    // SerpAPI surfaces auth/quota errors as a 200 with an { error } body
+    if (data.error) {
+      return res.json({ keyPresent: true, stage: 'api_error', error: data.error });
+    }
+    if (!data.place_result) {
+      return res.json({ keyPresent: true, stage: 'response_shape', error: 'place_result missing from response', raw: data });
+    }
+    const numRooms = data.place_result.num_rooms ?? null;
+    if (numRooms === null) {
+      return res.json({ keyPresent: true, stage: 'num_rooms_missing', placeName: data.place_result.name, raw: data.place_result });
+    }
+    res.json({ keyPresent: true, stage: 'ok', placeId: testPlaceId, placeName: data.place_result.name, numRooms });
+  } catch (err) {
+    const status = err.response?.status;
+    const stage = status === 401 || status === 403 ? 'auth' : status ? 'http_error' : 'network';
+    res.json({ keyPresent: true, stage, httpStatus: status ?? null, error: err.response?.data?.error || err.message });
+  }
+});
+
 // GET /api/test-claude — diagnostic: make a real Claude call and return raw response
 app.get('/api/test-claude', async (req, res) => {
   const claude = getClaudeClient();
@@ -547,6 +578,7 @@ app.get('/api/status', (req, res) => {
     google: !!(process.env.GOOGLE_PLACES_API_KEY && process.env.GOOGLE_PLACES_API_KEY !== 'your_google_places_api_key_here'),
     tripadvisor: !!(process.env.TRIPADVISOR_API_KEY && process.env.TRIPADVISOR_API_KEY !== 'your_tripadvisor_api_key_here'),
     claude: !!(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your_anthropic_api_key_here'),
+    serpapi: !!(process.env.SERPAPI_KEY && process.env.SERPAPI_KEY !== 'your_serpapi_key_here'),
     github: !!(process.env.GITHUB_TOKEN && process.env.GITHUB_REPO),
   });
 });
