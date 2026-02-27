@@ -511,7 +511,7 @@ app.get('/api/rooms-lookup', async (req, res) => {
       // The physical address is stable across rebrands — use Jaccard similarity
       // on address tokens to identify the right hotel even with the wrong name.
       if (!match && lat && lng && address) {
-        const geoParams = { ...baseParams, latLong: `${lat},${lng}`, radius: 0.5, radiusUnit: 'km' };
+        const geoParams = { ...baseParams, searchQuery: name, latLong: `${lat},${lng}`, radius: 0.5, radiusUnit: 'km' };
         console.log('[rooms-lookup] TA address-search params:', JSON.stringify(geoParams));
         const r2 = await taClient.get('/location/search', { params: geoParams });
         const results2 = r2.data?.data || [];
