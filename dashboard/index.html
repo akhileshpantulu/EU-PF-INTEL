@@ -1373,7 +1373,7 @@ function renderSavedHotelOverview(hotel) {
             <div class="property-title">${escHtml(hotel.name)}</div>
             ${hotel.numRooms
               ? `<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:#a5b4fc;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:500;">🏨 ${hotel.numRooms} rooms</span>`
-              : `<span id="rooms-gem" style="display:inline-flex;align-items:center;gap:4px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:#a5b4fc;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:500;">🏨 <span id="rooms-gem-val" style="font-style:italic;opacity:0.7;">looking up…</span></span>`}
+              : `<span id="rooms-gem" style="display:inline-flex;align-items:center;gap:4px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:#a5b4fc;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:500;">🏨 <span id="rooms-gem-val" style="font-style:italic;opacity:0.7;">looking up…</span></span><span id="rooms-ta-id" style="font-size:10px;opacity:0.45;color:#a5b4fc;display:none;"></span>`}
           </div>
           <div class="property-location"><span>📍</span><span>${escHtml(hotel.address || '')}</span></div>
         </div>
@@ -1750,7 +1750,7 @@ function renderSearchOverview(hotel, taData, taError) {
           <div style="margin-bottom:8px;"><span class="brand-tag">Search Result</span></div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <div class="property-title">${escHtml(hotel.name)}</div>
-            <span id="rooms-gem" style="display:inline-flex;align-items:center;gap:4px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:#a5b4fc;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:500;">🏨 <span id="rooms-gem-val" style="font-style:italic;opacity:0.7;">looking up…</span></span>
+            <span id="rooms-gem" style="display:inline-flex;align-items:center;gap:4px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:#a5b4fc;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:500;">🏨 <span id="rooms-gem-val" style="font-style:italic;opacity:0.7;">looking up…</span></span><span id="rooms-ta-id" style="font-size:10px;opacity:0.45;color:#a5b4fc;display:none;"></span>
           </div>
           <div class="property-location"><span>📍</span><span>${escHtml(hotel.address || '')}</span></div>
         </div>
@@ -2320,9 +2320,15 @@ async function fetchAndDisplayRooms(name, address, folderId, placeId) {
   try {
     const r = await fetch(`/api/rooms-lookup?${new URLSearchParams({ name: name || '', address: address || '' })}`);
     if (!r.ok) return;
-    const { numRooms } = await r.json();
+    const { numRooms, taLocationId } = await r.json();
     const el = document.getElementById('rooms-gem-val');
     if (!el) return; // user navigated away
+    // Show TA location ID in small muted text so it can be verified
+    const taEl = document.getElementById('rooms-ta-id');
+    if (taEl && taLocationId) {
+      taEl.textContent = `TA: ${taLocationId}`;
+      taEl.style.display = 'inline';
+    }
     if (numRooms) {
       el.textContent = `${numRooms} rooms`;
       el.style.fontStyle = 'normal';

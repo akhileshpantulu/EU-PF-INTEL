@@ -448,7 +448,7 @@ app.get('/api/rooms-lookup', async (req, res) => {
     }
     // Step 2: look up room count via SerpAPI
     const numRooms = taLocationId ? await lookupRoomsViaSerpApi(taLocationId) : null;
-    res.json({ numRooms });
+    res.json({ numRooms, taLocationId });
   } catch (err) {
     console.error('[rooms-lookup] error:', err.response?.data || err.message);
     res.json({ numRooms: null }); // fail gracefully — never block the UI
