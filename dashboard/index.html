@@ -2365,6 +2365,21 @@ async function fetchAndDisplayRooms(name, address, folderId, placeId, lat, lng) 
           if (photoContent) photoContent.innerHTML = renderPhotos(lightboxPhotos);
           const photoTab = document.getElementById('tab-photos');
           if (photoTab) photoTab.innerHTML = `Photos${lightboxPhotos.length > 0 ? ` <span style="opacity:0.6;font-size:11px;">(${lightboxPhotos.length})</span>` : ''}`;
+
+          // Also replace TA reviews with the geo-correct set — same root cause as photos.
+          const freshTaReviews = taFresh.reviews || [];
+          if (currentSearchHotel?.tripadvisor) {
+            currentSearchHotel.tripadvisor.reviews = freshTaReviews;
+          }
+          if (_reviewCtx) {
+            _reviewCtx.taReviews = freshTaReviews;
+          }
+          const reviewContent = document.getElementById('tab-content-reviews');
+          if (reviewContent && currentSearchHotel) {
+            reviewContent.innerHTML = renderSearchDualReviews(
+              currentSearchHotel.reviews || [], freshTaReviews
+            );
+          }
         }
       } catch { /* fail silently — photos already displaying */ }
     }
