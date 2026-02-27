@@ -167,7 +167,7 @@ async function lookupRoomsViaClaude(name, address) {
   const prompt = `You are a hotel industry database. What is the exact total number of guest rooms (keys) at "${name}" located at "${address}"? Think carefully — recall the specific property, not a similar-named one. Reply with ONLY a single integer (e.g. 316). If you cannot find this specific property with confidence, reply with the single word null.`;
   try {
     const res = await claude.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: 64,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -353,7 +353,7 @@ app.post('/api/folders/:id/hotels', async (req, res) => {
       placeId, name: full.name || name, address: full.address || address,
       rating: full.rating ?? rating, totalRatings: full.totalRatings ?? totalRatings,
       lat: full.lat, lng: full.lng,
-      numRooms: taFull?.numRooms || claudeRooms || null,
+      numRooms: claudeRooms || null,
       savedAt: now, lastFetched: now,
       cachedData: { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos, tripadvisor: taFull }
     };
@@ -395,7 +395,6 @@ app.post('/api/folders/:folderId/hotels/:placeId/refresh', async (req, res) => {
     hotel.totalRatings = full.totalRatings;
     hotel.lat = full.lat;
     hotel.lng = full.lng;
-    if (!hotel.numRooms && taFull?.numRooms) hotel.numRooms = taFull.numRooms;
     hotel.lastFetched = new Date().toISOString();
     hotel.cachedData = { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos, tripadvisor: taFull || hotel.cachedData?.tripadvisor };
     savePortfolios(data);
