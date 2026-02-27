@@ -539,6 +539,37 @@ app.get('/api/rooms-lookup', async (req, res) => {
 
       if (!match) console.log('[rooms-lookup] no confident TA match found');
       taLocationId = match?.location_id || null;
+
+      // Strategy C: Google search via SerpAPI to find the TA page directly.
+      // TA's own search API ranks by popularity and may omit hotels that were
+      // recently rebranded (low review count, coordinates not yet propagated).
+      // Google's crawler picks up name changes quickly; a Hotel_Review URL
+      // embeds the TA location ID as -d<id>-, so we can extract it reliably
+      // without making any further TA API calls.
+      if (!taLocationId) {
+        const serpKey = process.env.SERPAPI_KEY;
+        if (serpKey && serpKey !== 'your_serpapi_key_here') {
+          const q = `"${name}" site:tripadvisor.com`;
+          console.log(`[rooms-lookup] Strategy C — SerpAPI google search: ${q}`);
+          try {
+            const sg = await axios.get('https://serpapi.com/search.json', {
+              params: { engine: 'google', q, api_key: serpKey, num: 5 },
+              timeout: 10000,
+            });
+            for (const r of (sg.data.organic_results || [])) {
+              const m = r.link?.match(/tripadvisor\.[^/]+\/Hotel_Review-g\d+-d(\d+)-/);
+              if (m) {
+                taLocationId = m[1];
+                console.log(`[rooms-lookup] google/serpapi match: TA location ${taLocationId} from "${r.link}"`);
+                break;
+              }
+            }
+            if (!taLocationId) console.log('[rooms-lookup] SerpAPI google search: no Hotel_Review URL found');
+          } catch (err) {
+            console.error('[rooms-lookup] SerpAPI google search error:', err.message);
+          }
+        }
+      }
     }
     // Step 2: look up room count via SerpAPI
     const numRooms = taLocationId ? await lookupRoomsViaSerpApi(taLocationId) : null;
