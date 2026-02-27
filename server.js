@@ -440,13 +440,37 @@ function hotelNameScore(target, candidate) {
   return tw.filter(w => cw.includes(w)).length / tw.length;
 }
 
-// Run a single TA location/search call and return the best-matching result above
-// the given score threshold, or null.
+// Score how well a TA candidate address matches the target using Jaccard similarity.
+// Used for recently rebranded hotels where the name in TA hasn't been updated yet.
+// Jaccard (intersection/union on unique tokens) avoids false positives from
+// shared city/country tokens that inflate simple overlap scores.
+function hotelAddressScore(targetAddress, candidateAddressObj) {
+  if (!targetAddress || !candidateAddressObj) return 0;
+  const parts = [
+    candidateAddressObj.street1,
+    candidateAddressObj.address_string,
+    candidateAddressObj.city,
+  ].filter(Boolean).join(' ');
+  if (!parts) return 0;
+  const norm = s => new Set(
+    s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 1)
+  );
+  const tw = norm(targetAddress);
+  const cw = norm(parts);
+  const intersection = [...tw].filter(w => cw.has(w)).length;
+  const union = new Set([...tw, ...cw]).size;
+  return union ? intersection / union : 0;
+}
+
+// Run a single TA location/search call and return the best name-matching result
+// above the given score threshold, or null.
 async function taBestMatch(taClient, params, targetName, threshold) {
   console.log('[rooms-lookup] TA search params:', JSON.stringify(params));
   const r = await taClient.get('/location/search', { params });
   const results = r.data?.data || [];
-  console.log('[rooms-lookup] TA candidates:', results.map(x => `${x.location_id} "${x.name}" score=${hotelNameScore(targetName, x.name).toFixed(2)}`));
+  console.log('[rooms-lookup] TA candidates:', results.map(x =>
+    `${x.location_id} "${x.name}" name=${hotelNameScore(targetName, x.name).toFixed(2)} addr="${x.address_obj?.address_string || ''}"`
+  ));
   const scored = results.map(x => ({ ...x, _score: hotelNameScore(targetName, x.name) }));
   const best = scored.sort((a, b) => b._score - a._score)[0];
   return best && best._score >= threshold ? best : null;
@@ -468,8 +492,9 @@ app.get('/api/rooms-lookup', async (req, res) => {
       });
       const baseParams = { category: 'hotels', language: 'en' };
 
-      // Strategy A: geo-search — TA ignores searchQuery when latLong is set,
-      // so it returns the top-ranked hotels within the radius. Pick the candidate
+      // Strategy A: geo + name match (handles the normal case).
+      // TA ignores searchQuery when latLong is set, so the results are the
+      // top-ranked hotels within the radius regardless of name. Pick the one
       // whose name best matches the target; require ≥50% word overlap.
       let match = null;
       if (lat && lng) {
@@ -478,11 +503,30 @@ app.get('/api/rooms-lookup', async (req, res) => {
           { ...baseParams, searchQuery: name, latLong: `${lat},${lng}`, radius: 1, radiusUnit: 'km' },
           name, 0.5
         );
-        if (match) console.log(`[rooms-lookup] geo match: ${match.location_id} "${match.name}" (score ${match._score.toFixed(2)})`);
+        if (match) console.log(`[rooms-lookup] geo/name match: ${match.location_id} "${match.name}" (score ${match._score.toFixed(2)})`);
       }
 
-      // Strategy B: text search — use name + address as the query.
-      // Lower threshold (0.33) since text search is more directed.
+      // Strategy A2: tight geo + address match (handles recently rebranded hotels).
+      // TA may still list the hotel under its old name, so name matching fails.
+      // The physical address is stable across rebrands — use Jaccard similarity
+      // on address tokens to identify the right hotel even with the wrong name.
+      if (!match && lat && lng && address) {
+        const geoParams = { ...baseParams, latLong: `${lat},${lng}`, radius: 0.5, radiusUnit: 'km' };
+        console.log('[rooms-lookup] TA address-search params:', JSON.stringify(geoParams));
+        const r2 = await taClient.get('/location/search', { params: geoParams });
+        const results2 = r2.data?.data || [];
+        const scored2 = results2.map(x => ({ ...x, _score: hotelAddressScore(address, x.address_obj) }));
+        console.log('[rooms-lookup] address candidates:', scored2.map(x =>
+          `"${x.name}" addr_score=${x._score.toFixed(2)} ("${x.address_obj?.address_string || ''}")`
+        ));
+        const best2 = scored2.sort((a, b) => b._score - a._score)[0];
+        if (best2?._score >= 0.5) {
+          match = best2;
+          console.log(`[rooms-lookup] geo/address match: ${match.location_id} "${match.name}" (addr_score ${match._score.toFixed(2)})`);
+        }
+      }
+
+      // Strategy B: text search + name match (fallback for hotels not near coordinates).
       if (!match) {
         const q = address ? `${name} ${address}` : name;
         match = await taBestMatch(
