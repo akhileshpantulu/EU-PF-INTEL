@@ -389,18 +389,20 @@ app.post('/api/folders/:folderId/hotels/:placeId/refresh', async (req, res) => {
   if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
   try {
     const taLocationId = hotel.cachedData?.tripadvisor?.locationId;
-    const [full, taFull] = await Promise.all([
+    const [full, taFull, claudeRooms] = await Promise.all([
       fetchHotelDetails(req.params.placeId),
       taLocationId ? fetchTAHotelDetails(taLocationId).catch(() => null) : Promise.resolve(null),
+      hotel.numRooms ? Promise.resolve(hotel.numRooms) : lookupRoomsViaClaude(hotel.name, hotel.address).catch(() => null),
     ]);
     hotel.rating = full.rating;
     hotel.totalRatings = full.totalRatings;
     hotel.lat = full.lat;
     hotel.lng = full.lng;
+    if (claudeRooms) hotel.numRooms = claudeRooms;
     hotel.lastFetched = new Date().toISOString();
     hotel.cachedData = { googleMapsUrl: full.googleMapsUrl, website: full.website, phone: full.phone, reviews: full.reviews, photos: full.photos, tripadvisor: taFull || hotel.cachedData?.tripadvisor };
     savePortfolios(data);
-    res.json({ ok: true, lastFetched: hotel.lastFetched });
+    res.json({ ok: true, lastFetched: hotel.lastFetched, numRooms: hotel.numRooms ?? null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -414,6 +416,20 @@ app.get('/api/folders/:folderId/hotels/:placeId', (req, res) => {
   const hotel = folder.hotels.find(h => h.placeId === req.params.placeId);
   if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
   res.json({ ...hotel, folderId: folder.id, folderName: folder.name });
+});
+
+// PATCH /api/folders/:folderId/hotels/:placeId/rooms — persist Claude-looked-up room count
+app.patch('/api/folders/:folderId/hotels/:placeId/rooms', (req, res) => {
+  const numRooms = parseInt(req.body?.numRooms);
+  if (!Number.isFinite(numRooms) || numRooms <= 0) return res.status(400).json({ error: 'valid numRooms required' });
+  const data = loadPortfolios();
+  const folder = data.folders.find(f => f.id === req.params.folderId);
+  if (!folder) return res.status(404).json({ error: 'Folder not found' });
+  const hotel = folder.hotels.find(h => h.placeId === req.params.placeId);
+  if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
+  hotel.numRooms = numRooms;
+  savePortfolios(data);
+  res.json({ ok: true });
 });
 
 // GET /api/rooms-lookup?name=...&address=... — Claude-powered room count lookup
