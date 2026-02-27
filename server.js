@@ -427,12 +427,37 @@ app.patch('/api/folders/:folderId/hotels/:placeId/rooms', (req, res) => {
   res.json({ ok: true });
 });
 
+// Score how well a TA candidate name matches the target hotel name.
+// The first meaningful word is the brand name — if it doesn't appear in the
+// candidate the score is 0 immediately, preventing geographic noise words
+// (e.g. "Paris", "La Villette") from producing false positive matches.
+function hotelNameScore(target, candidate) {
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+  const tw = norm(target);
+  const cw = norm(candidate);
+  if (!tw.length) return 0;
+  if (!cw.includes(tw[0])) return 0; // brand name must match
+  return tw.filter(w => cw.includes(w)).length / tw.length;
+}
+
+// Run a single TA location/search call and return the best-matching result above
+// the given score threshold, or null.
+async function taBestMatch(taClient, params, targetName, threshold) {
+  console.log('[rooms-lookup] TA search params:', JSON.stringify(params));
+  const r = await taClient.get('/location/search', { params });
+  const results = r.data?.data || [];
+  console.log('[rooms-lookup] TA candidates:', results.map(x => `${x.location_id} "${x.name}" score=${hotelNameScore(targetName, x.name).toFixed(2)}`));
+  const scored = results.map(x => ({ ...x, _score: hotelNameScore(targetName, x.name) }));
+  const best = scored.sort((a, b) => b._score - a._score)[0];
+  return best && best._score >= threshold ? best : null;
+}
+
 // GET /api/rooms-lookup?name=...&address=... — SerpAPI-powered room count lookup
 app.get('/api/rooms-lookup', async (req, res) => {
   const { name, address, lat, lng } = req.query;
   if (!name) return res.status(400).json({ error: 'name required' });
   try {
-    // Step 1: resolve TripAdvisor location ID — use lat/lng when available for precision
+    // Step 1: resolve TripAdvisor location ID
     const taKey = process.env.TRIPADVISOR_API_KEY;
     let taLocationId = null;
     if (taKey) {
@@ -441,19 +466,35 @@ app.get('/api/rooms-lookup', async (req, res) => {
         headers: { accept: 'application/json' },
         params: { key: taKey },
       });
-      const taParams = { searchQuery: name, category: 'hotels', language: 'en' };
+      const baseParams = { category: 'hotels', language: 'en' };
+
+      // Strategy A: geo-search — TA ignores searchQuery when latLong is set,
+      // so it returns the top-ranked hotels within the radius. Pick the candidate
+      // whose name best matches the target; require ≥50% word overlap.
+      let match = null;
       if (lat && lng) {
-        taParams.latLong = `${lat},${lng}`;
-        taParams.radius = 1;
-        taParams.radiusUnit = 'km';
-      } else if (address) {
-        taParams.searchQuery = `${name} ${address}`;
+        match = await taBestMatch(
+          taClient,
+          { ...baseParams, searchQuery: name, latLong: `${lat},${lng}`, radius: 1, radiusUnit: 'km' },
+          name, 0.5
+        );
+        if (match) console.log(`[rooms-lookup] geo match: ${match.location_id} "${match.name}" (score ${match._score.toFixed(2)})`);
       }
-      console.log('[rooms-lookup] TA search params:', JSON.stringify(taParams));
-      const r = await taClient.get('/location/search', { params: taParams });
-      const taResults = r.data?.data || [];
-      console.log('[rooms-lookup] TA candidates:', taResults.map(x => `${x.location_id} "${x.name}" ${x.address_obj?.address_string || ''}`));
-      taLocationId = taResults[0]?.location_id || null;
+
+      // Strategy B: text search — use name + address as the query.
+      // Lower threshold (0.33) since text search is more directed.
+      if (!match) {
+        const q = address ? `${name} ${address}` : name;
+        match = await taBestMatch(
+          taClient,
+          { ...baseParams, searchQuery: q },
+          name, 0.33
+        );
+        if (match) console.log(`[rooms-lookup] text match: ${match.location_id} "${match.name}" (score ${match._score.toFixed(2)})`);
+      }
+
+      if (!match) console.log('[rooms-lookup] no confident TA match found');
+      taLocationId = match?.location_id || null;
     }
     // Step 2: look up room count via SerpAPI
     const numRooms = taLocationId ? await lookupRoomsViaSerpApi(taLocationId) : null;
