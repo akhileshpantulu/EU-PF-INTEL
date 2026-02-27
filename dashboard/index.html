@@ -1328,7 +1328,7 @@ async function selectSavedHotel(folderId, placeId) {
     const hotel = await fetch(`/api/folders/${encodeURIComponent(folderId)}/hotels/${encodeURIComponent(placeId)}`).then(r => r.json());
     if (hotel.error) throw new Error(hotel.error);
     renderSavedHotelOverview(hotel);
-    if (!hotel.numRooms) fetchAndDisplayRooms(hotel.name, hotel.address);
+    if (!hotel.numRooms) fetchAndDisplayRooms(hotel.name, hotel.address, hotel.folderId, hotel.placeId);
     const _savedCached = hotel.cachedData?.reviewAnalysis || _reviewCache.get(hotel.placeId) || null;
     _reviewCtx = {
       name: hotel.name,
@@ -2316,7 +2316,7 @@ document.addEventListener('keydown', e => {
 // ─────────────────────────────────────────
 //  Claude Room Count
 // ─────────────────────────────────────────
-async function fetchAndDisplayRooms(name, address) {
+async function fetchAndDisplayRooms(name, address, folderId, placeId) {
   try {
     const r = await fetch(`/api/rooms-lookup?${new URLSearchParams({ name: name || '', address: address || '' })}`);
     if (!r.ok) return;
@@ -2327,6 +2327,13 @@ async function fetchAndDisplayRooms(name, address) {
       el.textContent = `${numRooms} rooms`;
       el.style.fontStyle = 'normal';
       el.style.opacity = '1';
+      if (folderId && placeId) {
+        fetch(`/api/folders/${encodeURIComponent(folderId)}/hotels/${encodeURIComponent(placeId)}/rooms`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numRooms })
+        }).catch(() => {});
+      }
     } else {
       document.getElementById('rooms-gem')?.remove();
     }
