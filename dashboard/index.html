@@ -1395,7 +1395,7 @@ function renderSavedHotelOverview(hotel) {
           <div class="rating-count">${(hotel.totalRatings || 0).toLocaleString()} reviews</div>
         </div>
         ${ta ? `
-        <div class="rating-block">
+        <div class="rating-block" id="ta-stats-block">
           <div class="rating-source ta">TripAdvisor</div>
           <div class="rating-main"><span class="rating-number ta">${ta.rating || '—'}</span><span class="rating-max">/ 5</span></div>
           <div class="stars-row">${starsHtml(ta.rating || 0)}</div>
@@ -1774,7 +1774,7 @@ function renderSearchOverview(hotel, taData, taError) {
           <div class="rating-count">${(hotel.totalRatings || 0).toLocaleString()} reviews</div>
         </div>
         ${taData ? `
-        <div class="rating-block">
+        <div class="rating-block" id="ta-stats-block">
           <div class="rating-source ta">TripAdvisor</div>
           <div class="rating-main">
             <span class="rating-number ta">${taData.rating || '—'}</span>
@@ -1785,7 +1785,7 @@ function renderSearchOverview(hotel, taData, taError) {
           ${taSubratingHtml ? `<div class="subratings">${taSubratingHtml}</div>` : ''}
           ${taData.rankingString ? `<div class="ranking-badge">${escHtml(taData.rankingString)}</div>` : ''}
         </div>` : taError ? `
-        <div class="rating-block">
+        <div class="rating-block" id="ta-stats-block">
           <div class="rating-source ta">TripAdvisor</div>
           <div style="color:var(--red);font-size:11px;margin-top:8px;line-height:1.5;">⚠ ${escHtml(taError)}</div>
         </div>` : ''}
@@ -1949,6 +1949,23 @@ function starsHtml(rating, max = 5) {
   ).join('');
 }
 
+function renderTaRatingBlockInner(ta) {
+  if (!ta || ta.error) return `<div style="color:var(--text-muted);font-size:12px;margin-top:8px;">${ta?.error || 'Not fetched'}</div>`;
+  const subratingHtml = ta.subratings
+    ? Object.values(ta.subratings).map(s => `
+        <div class="subrating-item">
+          <span class="subrating-label">${escHtml(s.name)}</span>
+          <span class="subrating-value">${s.value} <span style="color:var(--star);font-size:10px;">★</span></span>
+        </div>`).join('')
+    : '';
+  return `
+    <div class="rating-main"><span class="rating-number ta">${ta.rating || '—'}</span><span class="rating-max">/ 5</span></div>
+    <div class="stars-row">${starsHtml(ta.rating || 0)}</div>
+    <div class="rating-count">${(ta.numReviews || 0).toLocaleString()} reviews</div>
+    ${subratingHtml ? `<div class="subratings">${subratingHtml}</div>` : ''}
+    ${ta.rankingString ? `<div class="ranking-badge">${escHtml(ta.rankingString)}</div>` : ''}`;
+}
+
 function renderPropertyOverview(id) {
   const p = portfolio.find(x => x.id === id);
   if (!p) return;
@@ -2014,7 +2031,7 @@ function renderPropertyOverview(id) {
           </div>
 
           <!-- TripAdvisor -->
-          <div class="rating-block">
+          <div class="rating-block" id="ta-stats-block">
             <div class="rating-source ta">TripAdvisor</div>
             ${ta && !ta.error ? `
               <div class="rating-main">
@@ -2366,7 +2383,7 @@ async function fetchAndDisplayRooms(name, address, folderId, placeId, lat, lng) 
           const photoTab = document.getElementById('tab-photos');
           if (photoTab) photoTab.innerHTML = `Photos${lightboxPhotos.length > 0 ? ` <span style="opacity:0.6;font-size:11px;">(${lightboxPhotos.length})</span>` : ''}`;
 
-          // Also replace TA reviews with the geo-correct set — same root cause as photos.
+          // Also replace TA reviews + stats with the geo-correct set — same root cause as photos.
           const freshTaReviews = taFresh.reviews || [];
           if (currentSearchHotel?.tripadvisor) {
             currentSearchHotel.tripadvisor.reviews = freshTaReviews;
@@ -2379,6 +2396,11 @@ async function fetchAndDisplayRooms(name, address, folderId, placeId, lat, lng) 
             reviewContent.innerHTML = renderSearchDualReviews(
               currentSearchHotel.reviews || [], freshTaReviews
             );
+          }
+          // Refresh TA stats block (rating, numReviews, subratings, ranking)
+          const statsBlock = document.getElementById('ta-stats-block');
+          if (statsBlock) {
+            statsBlock.innerHTML = `<div class="rating-source ta">TripAdvisor</div>${renderTaRatingBlockInner(taFresh)}`;
           }
         }
       } catch { /* fail silently — photos already displaying */ }
