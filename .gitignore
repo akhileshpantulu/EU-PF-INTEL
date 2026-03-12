@@ -4,3 +4,4 @@ data/
 !docs/data/
 *.log
 .DS_Store
+saved-portfolios.json
