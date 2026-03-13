@@ -427,21 +427,48 @@ app.patch('/api/folders/:folderId/hotels/:placeId/rooms', (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/rooms-lookup?name=...&address=... — SerpAPI-powered room count lookup
-// Uses SerpAPI Google search to find the hotel's TripAdvisor page, extracts the
-// location ID from the Hotel_Review URL, then calls SerpAPI tripadvisor_place for
-// the authoritative num_rooms figure directly from TripAdvisor.
+// Score how well a TA candidate name matches the target hotel name.
+// The first meaningful word is the brand name — if it doesn't appear in the
+// candidate the score is 0 immediately, preventing geographic noise words
+// (e.g. "Paris", "La Villette") from producing false positive matches.
+function hotelNameScore(target, candidate) {
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+  const tw = norm(target);
+  const cw = norm(candidate);
+  if (!tw.length) return 0;
+  if (!cw.includes(tw[0])) return 0; // brand name must match
+  return tw.filter(w => cw.includes(w)).length / tw.length;
+}
+
+// Run a single TA location/search call and return the best name-matching result
+// above the given score threshold, or null.
+async function taBestMatch(taClient, params, targetName, threshold) {
+  console.log('[rooms-lookup] TA search params:', JSON.stringify(params));
+  const r = await taClient.get('/location/search', { params });
+  const results = r.data?.data || [];
+  console.log('[rooms-lookup] TA candidates:', results.map(x =>
+    `${x.location_id} "${x.name}" name=${hotelNameScore(targetName, x.name).toFixed(2)} addr="${x.address_obj?.address_string || ''}"`
+  ));
+  const scored = results.map(x => ({ ...x, _score: hotelNameScore(targetName, x.name) }));
+  const best = scored.sort((a, b) => b._score - a._score)[0];
+  return best && best._score >= threshold ? best : null;
+}
+
+// GET /api/rooms-lookup?name=...&address=...&lat=...&lng=...
+// Primary:  SerpAPI Google search → extract TA location ID from Hotel_Review URL
+// Fallback: TripAdvisor API (geo then text) when SerpAPI finds no Hotel_Review URL
+// Room count is always via SerpAPI tripadvisor_place once an ID is resolved.
 app.get('/api/rooms-lookup', async (req, res) => {
-  const { name } = req.query;
+  const { name, address, lat, lng } = req.query;
   if (!name) return res.status(400).json({ error: 'name required' });
   try {
     let taLocationId = null;
+
+    // Step 1a: SerpAPI Google search — primary path.
+    // Google's crawler picks up Hotel_Review URLs with the TA location ID embedded
+    // as -d<id>-, giving a stable match without relying on TA's own popularity ranking.
     const serpKey = process.env.SERPAPI_KEY;
     if (serpKey && serpKey !== 'your_serpapi_key_here') {
-      // Step 1: Google search via SerpAPI to find the hotel's TripAdvisor page.
-      // Google indexes TripAdvisor Hotel_Review URLs with the location ID embedded
-      // as -d<id>-, giving us a reliable ID without relying on TripAdvisor's own
-      // search API (which ranks by popularity and can return wrong hotels).
       const q = `"${name}" site:tripadvisor.com`;
       console.log(`[rooms-lookup] SerpAPI google search: ${q}`);
       try {
@@ -462,14 +489,58 @@ app.get('/api/rooms-lookup', async (req, res) => {
         console.error('[rooms-lookup] SerpAPI google search error:', err.message);
       }
     } else {
-      console.log('[rooms-lookup] SERPAPI_KEY not configured — skipping room lookup');
+      console.log('[rooms-lookup] SERPAPI_KEY not configured');
     }
+
+    // Step 1b: TripAdvisor API fallback — used when SerpAPI Google search produces
+    // no Hotel_Review URL (quota exhausted, network error, or SERPAPI_KEY absent).
+    // TA's own search ranks by popularity and may resolve the wrong property, so we
+    // apply name-scoring to filter candidates. Two sub-strategies:
+    //   A) geo + name match (requires lat/lng, ≥50% word overlap)
+    //   B) text-only match (requires all target-name words to appear, score = 1.0)
+    if (!taLocationId) {
+      const taKey = process.env.TRIPADVISOR_API_KEY;
+      if (taKey) {
+        const taClient = axios.create({
+          baseURL: 'https://api.content.tripadvisor.com/api/v1',
+          headers: { accept: 'application/json' },
+          params: { key: taKey },
+        });
+        const baseParams = { category: 'hotels', language: 'en' };
+        let match = null;
+
+        if (lat && lng) {
+          match = await taBestMatch(
+            taClient,
+            { ...baseParams, searchQuery: name, latLong: `${lat},${lng}`, radius: 1, radiusUnit: 'km' },
+            name, 0.5
+          );
+          if (match) console.log(`[rooms-lookup] TA geo/name fallback: ${match.location_id} "${match.name}" (score ${match._score.toFixed(2)})`);
+        }
+
+        if (!match) {
+          const q = address ? `${name} ${address}` : name;
+          match = await taBestMatch(
+            taClient,
+            { ...baseParams, searchQuery: q },
+            name, 1.0
+          );
+          if (match) console.log(`[rooms-lookup] TA text fallback: ${match.location_id} "${match.name}" (score ${match._score.toFixed(2)})`);
+        }
+
+        if (!match) console.log('[rooms-lookup] TA API fallback: no confident match found');
+        taLocationId = match?.location_id || null;
+      } else {
+        console.log('[rooms-lookup] TRIPADVISOR_API_KEY not configured — no fallback available');
+      }
+    }
+
     // Step 2: look up room count via SerpAPI tripadvisor_place
     const numRooms = taLocationId ? await lookupRoomsViaSerpApi(taLocationId) : null;
     res.json({ numRooms, taLocationId });
   } catch (err) {
     console.error('[rooms-lookup] error:', err.response?.data || err.message);
-    res.json({ numRooms: null }); // fail gracefully — never block the UI
+    res.json({ numRooms: null, taLocationId: null }); // fail gracefully — never block the UI
   }
 });
 
