@@ -921,8 +921,6 @@
   <div class="header-right">
     <span class="last-fetch" id="last-fetch">Loading...</span>
     <button class="header-refresh-btn" id="header-refresh-btn" onclick="refreshAllData()">↻ Refresh Data</button>
-    <span class="badge badge-google" id="google-badge">Google</span>
-    <span class="badge badge-ta" id="ta-badge">TripAdvisor</span>
   </div>
 </header>
 
@@ -934,21 +932,7 @@
       <input class="search-box" id="search" type="text" placeholder="Search any hotel...">
     </div>
 
-    <div class="filter-group" id="sort-group">
-      <select class="sort-select" id="sort-select">
-        <option value="id">Sort: Property #</option>
-        <option value="name">Sort: Name A–Z</option>
-        <option value="city">Sort: City</option>
-        <option value="google-rating">Sort: Google Rating ↓</option>
-        <option value="ta-rating">Sort: TA Rating ↓</option>
-        <option value="google-reviews">Sort: Google Reviews ↓</option>
-      </select>
-    </div>
-
-    <div class="sidebar-section" id="list-label" style="margin-top:8px;">Properties</div>
-    <div class="property-list" id="property-list">
-      <div class="loading"><div class="spinner"></div></div>
-    </div>
+    <div class="property-list" id="property-list"></div>
 
     <!-- Named Folders -->
     <div class="folders-section" id="folders-section">
@@ -1058,40 +1042,6 @@ async function init() {
       document.getElementById('last-fetch').textContent = 'No data fetched yet';
     }
 
-    if (meta.googleSuccess !== undefined) {
-      document.getElementById('google-badge').textContent =
-        `Google ${meta.googleSuccess}/${meta.propertyCount}`;
-    }
-    if (meta.taSuccess !== undefined) {
-      document.getElementById('ta-badge').textContent =
-        `TripAdvisor ${meta.taSuccess}/${meta.propertyCount}`;
-    }
-
-    // TripAdvisor key / data diagnostic
-    if (status.tripadvisor === false) {
-      const taBadge = document.getElementById('ta-badge');
-      taBadge.textContent = 'TripAdvisor: key missing';
-      taBadge.style.background = 'rgba(251,146,60,0.1)';
-      taBadge.style.color = '#fb923c';
-      taBadge.style.borderColor = 'rgba(251,146,60,0.3)';
-    } else if (meta.taSuccess === 0) {
-      const taBadge = document.getElementById('ta-badge');
-      taBadge.textContent = 'TripAdvisor: no data — click Refresh';
-      taBadge.style.background = 'rgba(251,146,60,0.1)';
-      taBadge.style.color = '#fb923c';
-      taBadge.style.borderColor = 'rgba(251,146,60,0.3)';
-    }
-
-    if (!Array.isArray(data) || data.length === 0) {
-      portfolio = [];
-      renderSidebar();
-      loadFolders();
-      showWelcome();
-      return;
-    }
-
-    portfolio = data;
-    renderSidebar();
     loadFolders();
     showWelcome();
 
@@ -1560,77 +1510,9 @@ function timeAgo(date) {
 // ─────────────────────────────────────────
 //  Sidebar
 // ─────────────────────────────────────────
-function getFilteredSorted() {
-  const q = document.getElementById('search').value.toLowerCase();
-  const sort = document.getElementById('sort-select').value;
-
-  let items = [...portfolio];
-
-  if (q) {
-    items = items.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      p.city.toLowerCase().includes(q) ||
-      p.brand.toLowerCase().includes(q) ||
-      String(p.id).includes(q)
-    );
-  }
-
-  items.sort((a, b) => {
-    switch (sort) {
-      case 'name': return a.name.localeCompare(b.name);
-      case 'city': return a.city.localeCompare(b.city);
-      case 'google-rating': {
-        const ar = a.google?.rating || 0;
-        const br = b.google?.rating || 0;
-        return br - ar;
-      }
-      case 'ta-rating': {
-        const ar = a.tripadvisor?.rating || 0;
-        const br = b.tripadvisor?.rating || 0;
-        return br - ar;
-      }
-      case 'google-reviews': {
-        const ar = a.google?.totalRatings || 0;
-        const br = b.google?.totalRatings || 0;
-        return br - ar;
-      }
-      default: return a.id - b.id;
-    }
-  });
-
-  return items;
-}
-
-function renderSidebar() {
-  const items = getFilteredSorted();
-  const list = document.getElementById('property-list');
-
-  if (items.length === 0) {
-    list.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:12px;text-align:center;">No properties match</div>';
-    return;
-  }
-
-  list.innerHTML = items.map(p => {
-    const gRating = p.google?.rating;
-    const tRating = p.tripadvisor?.rating;
-    const isActive = p.id === selectedId;
-
-    return `
-      <div class="property-item ${isActive ? 'active' : ''}" onclick="selectProperty(${p.id})">
-        <div class="property-item-name">${p.id}. ${p.name}</div>
-        <div class="property-item-meta">
-          <span class="property-item-city">${p.city}, ${p.state}</span>
-          ${gRating ? `<span class="mini-rating google"><span class="star">★</span><span class="val">${gRating}</span></span>` : ''}
-          ${tRating ? `<span class="mini-rating ta"><span class="star">★</span><span class="val">${tRating}</span></span>` : ''}
-        </div>
-      </div>
-    `;
-  }).join('');
-}
+function renderSidebar() { /* portfolio list removed */ }
 
 document.getElementById('search').addEventListener('input', onSearchInput);
-document.getElementById('sort-select').addEventListener('change', renderSidebar);
-
 // ─────────────────────────────────────────
 //  Live Hotel Search
 // ─────────────────────────────────────────
@@ -1639,13 +1521,9 @@ let searchTimeout = null;
 function onSearchInput() {
   const q = document.getElementById('search').value.trim();
   if (q.length === 0) {
-    document.getElementById('sort-group').style.display = '';
-    document.getElementById('list-label').textContent = 'Portfolio';
-    renderSidebar();
+    document.getElementById('property-list').innerHTML = '';
     return;
   }
-  document.getElementById('sort-group').style.display = 'none';
-  document.getElementById('list-label').textContent = 'Search Results';
   if (q.length < 3) {
     document.getElementById('property-list').innerHTML =
       '<div style="padding:16px;color:var(--text-muted);font-size:12px;text-align:center;">Keep typing…</div>';
